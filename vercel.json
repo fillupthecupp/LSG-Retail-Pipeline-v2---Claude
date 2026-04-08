@@ -1,6 +1,9 @@
 {
   "functions": {
-    "api/*.js": {
+    "api/ingest-om.js": {
+      "maxDuration": 60
+    },
+    "api/blob-upload.js": {
       "maxDuration": 30
     }
   }

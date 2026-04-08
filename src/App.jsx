@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { upload } from '@vercel/blob/client';
 import {
   Building2, Search, Plus, Upload, X, ArrowUpDown,
   Trash2, ChevronDown, AlertCircle, CheckCircle2,
@@ -43,15 +44,6 @@ const EMPTY_FORM = {
 };
 
 function cn(...c) { return c.filter(Boolean).join(' '); }
-
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => { const s = String(r.result||''); resolve(s.includes(',') ? s.split(',')[1] : s); };
-    r.onerror = reject;
-    r.readAsDataURL(file);
-  });
-}
 
 function parseSortable(v) {
   if (v==null) return '';
@@ -100,6 +92,7 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
   const [omFile, setOmFile] = useState(null);
   const [ingesting, setIngesting] = useState(false);
   const [ingestError, setIngestError] = useState('');
+  const [ingestWarn, setIngestWarn] = useState('');
   const [ingestDone, setIngestDone] = useState(false);
   const [missing, setMissing] = useState([]);
 
@@ -109,11 +102,18 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
     if (!omFile) return;
     setIngesting(true); setIngestError(''); setIngestDone(false); setMissing([]);
     try {
-      const b64 = await fileToBase64(omFile);
+      const blob = await upload(omFile.name, omFile, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-upload',
+      });
       const resp = await fetch('/api/ingest-om', {
         method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ filename: omFile.name, dataBase64: b64 }),
+        body: JSON.stringify({ filename: omFile.name, url: blob.url }),
       });
+
+      if (resp.status === 413) {
+        throw new Error('File is too large for the server (413). Please use a PDF under 15 MB or compress it first.');
+      }
 
       // Guard against HTML error pages (e.g. 404 when API route not found)
       const contentType = resp.headers.get('content-type') || '';
@@ -168,9 +168,30 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
                 <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50">
                   <Upload className="h-4 w-4"/>
                   Choose PDF
-                  <input type="file" accept=".pdf" className="hidden" onChange={e=>{setOmFile(e.target.files?.[0]||null);setIngestError('');setIngestDone(false);}}/>
+                  <input type="file" accept=".pdf" className="hidden" onChange={e=>{
+                    const file = e.target.files?.[0];
+                    setIngestDone(false); setIngestError(''); setIngestWarn('');
+                    if (file) {
+                      if (file.size > 50 * 1024 * 1024) { // 50 MB hard limit
+                        setIngestError('File is too large (over 50 MB). Please choose a smaller PDF or compress it.');
+                        setOmFile(null);
+                      } else {
+                        setOmFile(file);
+                        if (file.size > 25 * 1024 * 1024) {
+                          setIngestWarn('Large file — extraction may be slow.');
+                        }
+                      }
+                    } else {
+                      setOmFile(null);
+                    }
+                  }}/>
                 </label>
-                {omFile && <span className="text-sm text-zinc-600 truncate max-w-[180px]">{omFile.name}</span>}
+                {omFile && (
+                  <span className="text-sm text-zinc-600 truncate max-w-[180px]">
+                    {omFile.name}
+                    <span className="ml-1 text-zinc-400 font-normal">({(omFile.size / 1024 / 1024).toFixed(1)} MB)</span>
+                  </span>
+                )}
                 <button
                   onClick={handleIngest}
                   disabled={!omFile||ingesting}
@@ -187,6 +208,11 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
               {ingestError && (
                 <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
                   <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0"/>{ingestError}
+                </div>
+              )}
+              {ingestWarn && !ingestError && (
+                <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0"/>{ingestWarn}
                 </div>
               )}
               {ingestDone && !ingestError && (

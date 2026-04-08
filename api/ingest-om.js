@@ -1,3 +1,5 @@
+import { del } from '@vercel/blob';
+
 const SYSTEM_PROMPT = `You are a senior commercial real estate acquisitions analyst at Lightstone Group.
 
 Read the uploaded offering memorandum PDF and extract the following fields for a retail deal pipeline tracker.
@@ -41,11 +43,9 @@ function safeParseJson(text) {
 }
 
 async function readBody(req) {
-  // If Vercel already parsed the body, use it directly
   if (req.body) {
     return typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
   }
-  // Otherwise read raw stream
   return new Promise((resolve, reject) => {
     let data = '';
     req.on('data', chunk => { data += chunk; });
@@ -58,7 +58,6 @@ async function readBody(req) {
 }
 
 export default async function handler(req, res) {
-  // CORS headers so browser can call this
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -87,10 +86,10 @@ export default async function handler(req, res) {
     return;
   }
 
-  const { filename, dataBase64 } = body || {};
+  const { filename, url } = body || {};
 
-  if (!filename || !dataBase64) {
-    res.status(400).json({ error: 'Missing filename or dataBase64 in request.' });
+  if (!filename || !url) {
+    res.status(400).json({ error: 'Missing filename or url in request.' });
     return;
   }
 
@@ -103,7 +102,7 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 1500,
         system: SYSTEM_PROMPT,
         messages: [
@@ -113,9 +112,8 @@ export default async function handler(req, res) {
               {
                 type: 'document',
                 source: {
-                  type: 'base64',
-                  media_type: 'application/pdf',
-                  data: dataBase64,
+                  type: 'url',
+                  url,
                 },
               },
               {
@@ -153,5 +151,8 @@ export default async function handler(req, res) {
       error: 'Unexpected server error.',
       details: err?.message || String(err),
     });
+  } finally {
+    // Clean up the blob regardless of success or failure
+    try { await del(url); } catch {}
   }
 }
