@@ -27,7 +27,8 @@
 
 - [x] Install @supabase/supabase-js
 - [x] Create `src/lib/supabase.js` — Supabase client initialization using env vars
-- [x] Create `db/schema.sql` — Repo B scalar schema; NOTE: must reconcile with Repo A v2.0 before Phase 3
+- [x] Create `db/schema.sql` — Repo A authority: snake_case, NUMERIC fields, raw_data JSONB
+- [x] Create `src/lib/dealMapper.js` — fromDbRow / toDbRow with semantic renames and parseNumeric
 - [ ] Create deals table in Supabase project (run db/schema.sql in Supabase SQL editor)
 - [x] Replace `localStorage.setItem` in `addDeal()` with Supabase insert
 - [x] Replace `localStorage.setItem` in `saveDeal()` with Supabase update

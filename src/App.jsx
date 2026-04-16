@@ -6,6 +6,7 @@ import {
   Pencil, Save,
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
+import { fromDbRow, toDbRow } from './lib/dealMapper';
 
 const STAGES = ['Screening', 'Underwriting', 'Bid', 'Active', 'Dead'];
 const STAGE_COLORS = {
@@ -284,7 +285,7 @@ export default function App() {
       .order('created_at', { ascending: false })
       .then(({ data, error }) => {
         if (error) console.error('Failed to load deals:', error);
-        setDeals(data || []);
+        setDeals((data || []).map(fromDbRow));
         setLoading(false);
       });
   }, []);
@@ -318,21 +319,20 @@ export default function App() {
     setShowAdd(false);
     const { data, error } = await supabase
       .from('deals')
-      .insert({ ...form, dateAdded: new Date().toISOString().slice(0, 10) })
+      .insert(toDbRow(form))
       .select()
       .single();
     if (error) { console.error('Failed to save deal:', error); return; }
-    setDeals(p => [data, ...p]);
+    setDeals(p => [fromDbRow(data), ...p]);
   }
 
   async function saveDeal(form) {
     setDeals(p => p.map(d => d.id === form.id ? form : d));
     setEditDeal(null);
-    const { id, created_at, updated_at, ...fields } = form;
     const { error } = await supabase
       .from('deals')
-      .update(fields)
-      .eq('id', id);
+      .update(toDbRow(form))
+      .eq('id', form.id);
     if (error) console.error('Failed to update deal:', error);
   }
 

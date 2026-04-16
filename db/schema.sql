@@ -1,57 +1,59 @@
 -- Retail Deal Pipeline & Screener — deals table
--- Schema version: Repo B Milestone 1 (Supabase persistence)
+-- Schema version: v2.0 (Repo A authority)
 -- Last updated: 2026-04-16
 --
--- IMPORTANT: This schema is derived from Repo B's PIPELINE_COLUMNS (18 fields).
--- It must be reconciled with Repo A's schema v2.0 before Phase 3.
+-- Naming: snake_case per Repo A authority.
+-- Design: scalar columns for indexed/queryable fields; raw_data JSONB for
+--   OM extraction output and Repo B display fields that are not scalar-indexed.
 --
--- Column naming: camelCase (quoted identifiers) to match App.jsx field names exactly.
--- No mapping layer required between JS and Postgres for this schema.
+-- Repo B display fields NOT stored as scalar columns (market, sf, acreage,
+--   yearBuiltRenovated, parkingCount, occupancy, walt, noi, keyAnchors,
+--   bidDate, notes) are stored inside raw_data and reconstructed by
+--   fromDbRow() in src/lib/dealMapper.js.
 --
--- Known reconciliation items for Phase 3:
---   - Repo A uses JSONB + scalar index design; this schema uses all-scalar TEXT columns.
---   - Repo A's live DB may have a 'screen' column whose purpose is undocumented in Repo B.
---     Do NOT add 'screen' until its semantics are confirmed.
---   - Repo A may use snake_case column names. If so, a name mapping layer will be needed.
+-- Deferred:
+--   screen     — not required for Milestone 1
+--   irr_levered_5, moic_5 — present as nullable; populated in Phase 3+ underwriting
+--   assignee, source_files — present as nullable; no UI fields yet
 --
--- Run this in the Supabase SQL editor for your project.
+-- To replace a prior schema: DROP TABLE IF EXISTS deals CASCADE; then run this file.
 
 CREATE TABLE IF NOT EXISTS deals (
-  id                    UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  ingested_at     TIMESTAMPTZ DEFAULT now(),
 
-  -- Property identification
-  "propertyName"        TEXT,
-  "propertyAddress"     TEXT,
-  market                TEXT,
-  "assetType"           TEXT,
+  -- Core deal identification (scalar-indexed)
+  deal_name       TEXT,
+  address         TEXT,
+  asset_type      TEXT,
 
-  -- Physical attributes
-  sf                    TEXT,
-  acreage               TEXT,
-  "yearBuiltRenovated"  TEXT,
-  "parkingCount"        TEXT,
+  -- Financial metrics (scalar-indexed, NUMERIC for screening/comparison)
+  purchase_price  NUMERIC,
+  going_in_cap    NUMERIC,
+  irr_levered_5   NUMERIC,    -- Phase 3+ underwriting output; null for manual entry
+  moic_5          NUMERIC,    -- Phase 3+ underwriting output; null for manual entry
 
-  -- Financial metrics
-  occupancy             TEXT,
-  walt                  TEXT,
-  "askingPrice"         TEXT,
-  noi                   TEXT,
-  "capRate"             TEXT,
+  -- Pipeline tracking
+  status          TEXT NOT NULL DEFAULT 'Screening',
 
-  -- Deal metadata
-  broker                TEXT,
-  "keyAnchors"          TEXT,
-  "bidDate"             TEXT,
-  stage                 TEXT NOT NULL DEFAULT 'Screening',
-  notes                 TEXT,
+  -- Sourcing
+  source_broker   TEXT,
+  assignee        TEXT,       -- no UI field yet
+  source_files    TEXT[],     -- set by Phase 3 ingest API; null for manual entry
 
-  -- Tracking
-  "dateAdded"           TEXT,
-  created_at            TIMESTAMPTZ DEFAULT NOW(),
-  updated_at            TIMESTAMPTZ DEFAULT NOW()
+  -- Schema management
+  schema_version  TEXT DEFAULT '1.0',
+
+  -- Full extraction payload + Repo B display-only fields
+  -- For manual entry: contains all form fields for round-trip fidelity.
+  -- For Phase 3 ingest: contains full Claude extraction response.
+  raw_data        JSONB,
+
+  created_at      TIMESTAMPTZ DEFAULT now(),
+  updated_at      TIMESTAMPTZ DEFAULT now()
 );
 
--- Auto-update updated_at on row modification
+-- Auto-update updated_at on every modification
 CREATE OR REPLACE FUNCTION update_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -60,13 +62,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE TRIGGER deals_updated_at
+DROP TRIGGER IF EXISTS deals_updated_at ON deals;
+CREATE TRIGGER deals_updated_at
   BEFORE UPDATE ON deals
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 -- Row Level Security
--- Single-tenant internal tool — allow all operations for the anon role.
--- Revisit if auth is added in a future phase.
+-- Single-tenant internal tool — permissive anon access, no auth for v1.
+-- Revisit before adding multi-user or public-facing access.
 ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "allow_all_anon" ON deals;

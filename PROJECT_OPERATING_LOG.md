@@ -143,6 +143,43 @@ See BACKLOG.md for the full deferred list.
 
 ## Log
 
+### 2026-04-16 — Schema correction pass: Repo A authority applied, mapper layer added
+
+**What happened:**
+- Rewrote db/schema.sql from scratch — Repo A authority (snake_case, NUMERIC fields, raw_data JSONB)
+- Created src/lib/dealMapper.js — fromDbRow and toDbRow with all semantic renames
+- Updated App.jsx persistence paths (addDeal, saveDeal, initial load) to route through mapper
+- deleteDeal unchanged (operates on id only)
+- handleIngest unchanged (populates form state; toDbRow handles translation on Save)
+
+**Schema changes (prior schema must be dropped and recreated):**
+- Column naming: camelCase quoted identifiers → snake_case
+- Column types: askingPrice/capRate TEXT → purchase_price/going_in_cap NUMERIC
+- Added: raw_data JSONB (non-negotiable per Repo A authority)
+- Added: source_files TEXT[], assignee TEXT, schema_version TEXT (nullable; no UI yet)
+- Added: irr_levered_5 NUMERIC, moic_5 NUMERIC (nullable; Phase 3+ underwriting)
+- Removed: all camelCase columns from prior schema
+- Kept: updated_at trigger, permissive anon RLS policy, id UUID, created_at, updated_at
+
+**Mapper design decisions:**
+- UI remains camelCase throughout (Repo B authority for UI vocabulary)
+- DB is snake_case (Repo A authority)
+- Semantic renames: askingPrice↔purchase_price, capRate↔going_in_cap, broker↔source_broker, stage↔status, propertyName↔deal_name, propertyAddress↔address, assetType↔asset_type
+- Fields with no scalar column (market, sf, acreage, etc.) stored in raw_data, reconstructed by fromDbRow
+- NUMERIC columns: parseNumeric() strips $, %, commas; returns null for unparseable strings (e.g. "Best Offer")
+- Original display strings (e.g. "$65,000,000") preserved in raw_data; fromDbRow prefers raw_data string over formatted NUMERIC for display fidelity
+- dateAdded (UI sort key) derived from ingested_at in fromDbRow
+
+**Known limitation noted in mapper:**
+- Manual edit of an OM-ingested deal overwrites raw_data with form state. Phase 3 extraction metadata beyond the 17 form fields will be lost on edit. Revisit deep-merge strategy in Phase 3.
+
+**Pending before Milestone 1 gate passes:**
+- Drop old deals table (if already created) and run new db/schema.sql in Supabase SQL editor
+- Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local
+- Run npm run dev and validate 7-step round-trip test
+
+---
+
 ### 2026-04-16 — Phase 2 implementation: Supabase persistence, localStorage removed
 
 **What happened:**
