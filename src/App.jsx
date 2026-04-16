@@ -125,25 +125,34 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
       const json = await resp.json();
       if (!resp.ok || !json?.ok) throw new Error(json?.error || json?.details || 'Ingestion failed.');
       const ex = json.extracted || {};
+      const highlights = Array.isArray(ex.highlights) ? ex.highlights : [];
       setForm(p => ({
         ...p,
-        propertyName:       ex.propertyName       || p.propertyName,
-        propertyAddress:    ex.propertyAddress     || p.propertyAddress,
-        market:             ex.market              || p.market,
-        assetType:          ex.assetType           || p.assetType,
-        sf:                 ex.sf                  || p.sf,
-        acreage:            ex.acreage             || p.acreage,
-        yearBuiltRenovated: ex.yearBuiltRenovated  || p.yearBuiltRenovated,
-        parkingCount:       ex.parkingCount        || p.parkingCount,
-        occupancy:          ex.occupancy           || p.occupancy,
-        walt:               ex.walt                || p.walt,
-        // askingPrice (Purchase Price) intentionally excluded — analyst-entered, not auto-filled
-        noi:                ex.noi                 || p.noi,
-        // capRate (Going-In Cap Rate) intentionally excluded — analyst-entered, not auto-filled
-        broker:             ex.broker              || p.broker,
-        keyAnchors:         ex.keyAnchors          || p.keyAnchors,
-        // Record the uploaded filename so it is saved to source_files on submit
-        sourceFiles:        [...(p.sourceFiles || []), omFile.name],
+        // Fast-pass field set
+        propertyName:    ex.propertyName    || p.propertyName,
+        propertyAddress: ex.propertyAddress || p.propertyAddress,
+        assetType:       ex.assetType       || p.assetType,
+        sf:              ex.sf              || p.sf,
+        occupancy:       ex.occupancy       || p.occupancy,
+        noi:             ex.noi             || p.noi,
+        walt:            ex.walt            || p.walt,
+        broker:          ex.broker          || p.broker,
+        keyAnchors:      ex.keyAnchors      || p.keyAnchors,
+        // askingPrice and capRate are analyst-owned — never auto-filled
+        // Pre-populate notes with extracted highlights; analyst can edit freely
+        notes: highlights.length > 0
+          ? highlights.map(h => `• ${h}`).join('\n')
+          : p.notes,
+        // Fast extract always sets stage to Screening
+        stage: 'Screening',
+        // Record uploaded filename for source_files
+        sourceFiles: [...(p.sourceFiles || []), omFile.name],
+        // Attach extraction metadata to raw_data for full-ingest phase
+        raw_data: {
+          ...(p.raw_data || {}),
+          highlights,
+          ingest_stage: 'fast',
+        },
       }));
       setMissing(Array.isArray(ex.missingFields) ? ex.missingFields : []);
       setIngestDone(true);
