@@ -9,27 +9,34 @@
  *   status, source_broker, assignee, source_files,
  *   schema_version, raw_data, created_at, updated_at
  *
- * Semantic renames (Repo B UI → Repo A DB):
+ * Semantic renames (UI → DB):
  *   propertyName    → deal_name
  *   propertyAddress → address
  *   assetType       → asset_type
- *   askingPrice     → purchase_price   (NUMERIC; original string preserved in raw_data)
- *   capRate         → going_in_cap     (NUMERIC; original string preserved in raw_data)
+ *   askingPrice     → purchase_price   (analyst-entered; NUMERIC scalar + string in raw_data)
+ *   capRate         → going_in_cap     (analyst-entered; NUMERIC scalar + string in raw_data)
  *   broker          → source_broker
  *   stage           → status
+ *   sourceFiles     → source_files
+ *
+ * Analyst-owned fields — purchase_price and going_in_cap:
+ *   These are set by the analyst, not auto-populated from OM extraction.
+ *   OM extraction intentionally skips these fields (see handleIngest in App.jsx).
+ *   The NUMERIC scalar is useful for future screener comparisons.
+ *   The original string (e.g. "$65,000,000") is preserved in raw_data for display.
  *
  * Repo B display fields with no scalar column — stored in raw_data only:
  *   market, sf, acreage, yearBuiltRenovated, parkingCount,
  *   occupancy, walt, noi, keyAnchors, bidDate, notes
  *
  * Phase 3+ fields present in schema but not in current UI:
- *   irr_levered_5, moic_5, assignee, source_files
+ *   irr_levered_5, moic_5, assignee
  */
 
 /**
  * Parse a form string value into a NUMERIC-compatible number.
  * Strips $, %, commas, whitespace. Returns null if the value is empty or
- * cannot be parsed as a finite number (e.g. "Best Offer", "TBD").
+ * cannot be parsed as a finite number (e.g. "Best Offer", "TBD", "Call for Pricing").
  * The original string is always preserved in raw_data for display fidelity.
  */
 function parseNumeric(v) {
@@ -40,18 +47,16 @@ function parseNumeric(v) {
 }
 
 /**
- * Build the raw_data JSONB payload from a UI form object.
+ * Build the form-state portion of raw_data from a UI form object.
  *
- * Stores all current Repo B display fields so fromDbRow can reconstruct
+ * Records all current Repo B display fields so fromDbRow can reconstruct
  * the full UI shape on read. This includes the original string values of
- * askingPrice and capRate, which may not survive round-trip via the NUMERIC
- * scalar columns (e.g. "$65,000,000" → 65000000 → "65000000" without this).
+ * askingPrice and capRate (e.g. "$65,000,000", "7.0%") which do not survive
+ * round-trip through the NUMERIC scalar columns without this preservation.
  *
- * PHASE 3 NOTE: For OM-ingested deals, the extraction API will supply its own
- * raw_data (the full Claude response). A subsequent manual edit will overwrite
- * raw_data with form state, losing any Phase 3 extraction metadata not surfaced
- * in the form. This trade-off is acceptable for Milestone 1. Revisit the merge
- * strategy (e.g. deep-merge raw_data on update) when Phase 3 is implemented.
+ * This object is MERGED into existing raw_data on update (not replaced),
+ * so any Phase 3 extraction metadata or extra keys are preserved.
+ * See toDbRow for the merge strategy.
  */
 function buildRawData(form) {
   return {
@@ -65,9 +70,9 @@ function buildRawData(form) {
     parkingCount:       form.parkingCount        ?? '',
     occupancy:          form.occupancy           ?? '',
     walt:               form.walt                ?? '',
-    askingPrice:        form.askingPrice         ?? '',  // original string; e.g. "$65,000,000"
+    askingPrice:        form.askingPrice         ?? '',  // analyst-entered; original string preserved
     noi:                form.noi                 ?? '',
-    capRate:            form.capRate             ?? '',  // original string; e.g. "7.07%"
+    capRate:            form.capRate             ?? '',  // analyst-entered; original string preserved
     broker:             form.broker              ?? '',
     keyAnchors:         form.keyAnchors          ?? '',
     bidDate:            form.bidDate             ?? '',
@@ -81,8 +86,11 @@ function buildRawData(form) {
  * Converts a Supabase DB row (snake_case) into the UI deal shape (camelCase).
  * Applied to every row returned by Supabase selects before setting React state.
  *
+ * Includes raw_data and sourceFiles on the output object so they survive through
+ * the edit form and back into toDbRow without requiring an extra DB read.
+ *
  * Display-string values prefer raw_data over formatted scalar to preserve
- * original OM formatting (e.g. "$65,000,000" not "65000000").
+ * original entry (e.g. "$65,000,000" not "65000000").
  */
 export function fromDbRow(row) {
   const raw = row.raw_data || {};
@@ -92,15 +100,22 @@ export function fromDbRow(row) {
     created_at:  row.created_at,
     updated_at:  row.updated_at,
     ingested_at: row.ingested_at,
-    // dateAdded is a UI sort key; derived from ingested_at for PIPELINE_COLUMNS compatibility
+    // dateAdded is a UI sort key derived from ingested_at for PIPELINE_COLUMNS compatibility
     dateAdded:   row.ingested_at
       ? row.ingested_at.slice(0, 10)
       : (row.created_at ? row.created_at.slice(0, 10) : ''),
+
+    // Pass raw_data through so edits can patch rather than overwrite (used in toDbRow)
+    raw_data:    row.raw_data || null,
+
+    // Pass source_files through so it survives edits without being cleared
+    sourceFiles: row.source_files || null,
 
     // Scalar-backed fields — prefer raw_data string for display fidelity
     propertyName:    raw.propertyName    || row.deal_name      || '',
     propertyAddress: raw.propertyAddress || row.address        || '',
     assetType:       raw.assetType       || row.asset_type     || '',
+    // askingPrice / capRate: analyst-entered; raw_data string takes priority over NUMERIC scalar
     askingPrice:     raw.askingPrice     ||
       (row.purchase_price != null ? String(row.purchase_price) : ''),
     capRate:         raw.capRate         ||
@@ -108,7 +123,7 @@ export function fromDbRow(row) {
     broker:          raw.broker          || row.source_broker  || '',
     stage:           row.status          || 'Screening',
 
-    // raw_data-only fields (no scalar column; no fallback other than empty string)
+    // raw_data-only fields (no scalar column)
     market:             raw.market             || '',
     sf:                 raw.sf                 || '',
     acreage:            raw.acreage            || '',
@@ -121,8 +136,8 @@ export function fromDbRow(row) {
     bidDate:            raw.bidDate            || '',
     notes:              raw.notes              || '',
 
-    // Phase 3+ fields: irr_levered_5, moic_5, assignee, source_files
-    // Not included here because the UI has no form fields or table columns for them yet.
+    // Phase 3+ fields: irr_levered_5, moic_5, assignee
+    // Not surfaced here — no UI form fields or table columns yet.
   };
 }
 
@@ -132,25 +147,39 @@ export function fromDbRow(row) {
  * Converts a UI form object (camelCase) into a Supabase insert/update payload (snake_case).
  * Applied before every insert or update.
  *
+ * raw_data strategy:
+ *   On insert: form.raw_data is undefined → { ...{}, ...buildRawData(form) } = buildRawData(form)
+ *   On update: form.raw_data is the existing DB value (passed through by fromDbRow) →
+ *     { ...existingRawData, ...buildRawData(form) } patches only the known form fields,
+ *     preserving any Phase 3 extraction metadata or extra keys in raw_data.
+ *
+ * source_files:
+ *   Populated from form.sourceFiles, which is set in handleIngest (App.jsx) when a PDF
+ *   is uploaded. Stores filenames as TEXT[]. Null for deals with no uploaded OM.
+ *   Richer provenance (blob URLs, timestamps) can extend this in a later phase.
+ *
  * Excluded intentionally:
  *   id          — managed by DB (PRIMARY KEY DEFAULT gen_random_uuid())
  *   created_at  — managed by DB (DEFAULT now())
  *   updated_at  — managed by DB trigger
  *   ingested_at — set by DB on insert (DEFAULT now()); not overwritten on update
- *   irr_levered_5, moic_5 — Phase 3+ underwriting; no UI fields yet
+ *   irr_levered_5, moic_5 — Phase 3+ underwriting output; no UI fields yet
  *   assignee    — no UI field yet
- *   source_files — set by Phase 3 ingest API route; null for manual form saves
  */
 export function toDbRow(form) {
   return {
     deal_name:      form.propertyName    || null,
     address:        form.propertyAddress || null,
     asset_type:     form.assetType       || null,
-    purchase_price: parseNumeric(form.askingPrice),
-    going_in_cap:   parseNumeric(form.capRate),
+    purchase_price: parseNumeric(form.askingPrice),   // analyst-entered; null if blank or unparseable
+    going_in_cap:   parseNumeric(form.capRate),        // analyst-entered; null if blank or unparseable
     status:         form.stage           || 'Screening',
     source_broker:  form.broker          || null,
+    source_files:   Array.isArray(form.sourceFiles) && form.sourceFiles.length > 0
+      ? form.sourceFiles
+      : null,
     schema_version: '1.0',
-    raw_data:       buildRawData(form),
+    // Patch existing raw_data with current form values; preserves any extra keys
+    raw_data: { ...(form.raw_data || {}), ...buildRawData(form) },
   };
 }

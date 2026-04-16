@@ -143,6 +143,37 @@ See BACKLOG.md for the full deferred list.
 
 ## Log
 
+### 2026-04-16 — Semantic correction + validation-prep pass
+
+**What happened:**
+- UI labels updated: "Asking Price" → "Purchase Price", "Cap Rate" → "Going-In Cap Rate"
+- Table column labels updated to match
+- Placeholders updated to say "Analyst-entered" for both fields
+- handleIngest: removed askingPrice and capRate from auto-fill (locked decision: analyst-owned)
+- handleIngest: added sourceFiles population with omFile.name on successful extraction
+- dealMapper.js: raw_data is now patched on update (not overwritten) — existing keys preserved
+- dealMapper.js: fromDbRow passes raw_data and sourceFiles through to form state
+- dealMapper.js: toDbRow maps source_files from form.sourceFiles
+- dealMapper.js: all comments updated to reflect locked decisions
+
+**Locked decisions applied:**
+- purchase_price = analyst-entered; OM extraction deliberately skips it
+- going_in_cap = analyst-entered; OM extraction deliberately skips it
+- source_files stores filenames for v1; richer provenance deferred
+- raw_data is patched on edit, not replaced
+
+**Milestone 1 validation target:**
+1. Open app → loading state → empty state
+2. Manually add deal with Purchase Price and Going-In Cap Rate
+3. Deal saves to Supabase with correct scalar values and raw_data
+4. Refresh → deal persists with all fields intact
+5. Edit deal → raw_data is patched, not overwritten
+6. Upload OM → Purchase Price and Going-In Cap Rate fields left blank for analyst
+7. Analyst fills in Purchase Price and Going-In Cap Rate → saves
+8. Delete deal → removed from Supabase
+
+---
+
 ### 2026-04-16 — Schema correction pass: Repo A authority applied, mapper layer added
 
 **What happened:**

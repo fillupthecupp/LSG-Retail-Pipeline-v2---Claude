@@ -28,9 +28,9 @@ const PIPELINE_COLUMNS = [
   { key: 'parkingCount',       label: 'Parking',        width: 'min-w-[85px]'  },
   { key: 'occupancy',          label: 'Occupancy',      width: 'min-w-[95px]'  },
   { key: 'walt',               label: 'WALT',           width: 'min-w-[75px]'  },
-  { key: 'askingPrice',        label: 'Asking Price',   width: 'min-w-[125px]' },
-  { key: 'noi',                label: 'NOI',            width: 'min-w-[115px]' },
-  { key: 'capRate',            label: 'Cap Rate',       width: 'min-w-[90px]'  },
+  { key: 'askingPrice',        label: 'Purchase Price',      width: 'min-w-[140px]' },
+  { key: 'noi',                label: 'NOI',                 width: 'min-w-[115px]' },
+  { key: 'capRate',            label: 'Going-In Cap',        width: 'min-w-[115px]' },
   { key: 'broker',             label: 'Broker',         width: 'min-w-[150px]' },
   { key: 'keyAnchors',         label: 'Key Anchors',    width: 'min-w-[170px]' },
   { key: 'bidDate',            label: 'Bid Date',       width: 'min-w-[105px]' },
@@ -138,11 +138,13 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
         parkingCount:       ex.parkingCount        || p.parkingCount,
         occupancy:          ex.occupancy           || p.occupancy,
         walt:               ex.walt                || p.walt,
-        askingPrice:        ex.askingPrice         || p.askingPrice,
+        // askingPrice (Purchase Price) intentionally excluded — analyst-entered, not auto-filled
         noi:                ex.noi                 || p.noi,
-        capRate:            ex.capRate             || p.capRate,
+        // capRate (Going-In Cap Rate) intentionally excluded — analyst-entered, not auto-filled
         broker:             ex.broker              || p.broker,
         keyAnchors:         ex.keyAnchors          || p.keyAnchors,
+        // Record the uploaded filename so it is saved to source_files on submit
+        sourceFiles:        [...(p.sourceFiles || []), omFile.name],
       }));
       setMissing(Array.isArray(ex.missingFields) ? ex.missingFields : []);
       setIngestDone(true);
@@ -241,9 +243,9 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
             <FF label="Parking Count" value={form.parkingCount} onChange={v=>set('parkingCount',v)} placeholder="3,335"/>
             <FF label="Occupancy" value={form.occupancy} onChange={v=>set('occupancy',v)} placeholder="85.7%"/>
             <FF label="WALT (yrs)" value={form.walt} onChange={v=>set('walt',v)} placeholder="6.34"/>
-            <FF label="Asking Price" value={form.askingPrice} onChange={v=>set('askingPrice',v)} placeholder="$65,000,000 or Best Offer"/>
+            <FF label="Purchase Price" value={form.askingPrice} onChange={v=>set('askingPrice',v)} placeholder="Analyst-entered — e.g. $65,000,000"/>
             <FF label="NOI" value={form.noi} onChange={v=>set('noi',v)} placeholder="$4,592,150"/>
-            <FF label="Cap Rate" value={form.capRate} onChange={v=>set('capRate',v)} placeholder="7.07%"/>
+            <FF label="Going-In Cap Rate" value={form.capRate} onChange={v=>set('capRate',v)} placeholder="Analyst-entered — e.g. 7.0%"/>
             <FF label="Broker / Source" value={form.broker} onChange={v=>set('broker',v)} placeholder="Colliers — El Warner"/>
             <FF label="Key Anchors" value={form.keyAnchors} onChange={v=>set('keyAnchors',v)} placeholder="Ross, Marshalls, HomeGoods"/>
             <FF label="Bid Date" value={form.bidDate} onChange={v=>set('bidDate',v)} type="date"/>
