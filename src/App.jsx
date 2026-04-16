@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { upload } from '@vercel/blob/client';
 import {
   Building2, Search, Plus, Upload, X, ArrowUpDown,
   Trash2, ChevronDown, AlertCircle, CheckCircle2,
@@ -103,13 +102,13 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
     if (!omFile) return;
     setIngesting(true); setIngestError(''); setIngestDone(false); setMissing([]);
     try {
-      const blob = await upload(omFile.name, omFile, {
-        access: 'public',
-        handleUploadUrl: '/api/blob-upload',
-      });
       const resp = await fetch('/api/ingest-om', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ filename: omFile.name, url: blob.url }),
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/pdf',
+          'X-Filename': encodeURIComponent(omFile.name),
+        },
+        body: omFile,
       });
 
       if (resp.status === 413) {

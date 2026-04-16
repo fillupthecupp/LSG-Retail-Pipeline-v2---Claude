@@ -1,5 +1,3 @@
-import { del } from '@vercel/blob';
-
 const SYSTEM_PROMPT = `You are a senior commercial real estate acquisitions analyst at Lightstone Group.
 
 Read the uploaded offering memorandum PDF and extract the following fields for a retail deal pipeline tracker.
@@ -42,17 +40,11 @@ function safeParseJson(text) {
   }
 }
 
-async function readBody(req) {
-  if (req.body) {
-    return typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-  }
+function readRawBody(req) {
   return new Promise((resolve, reject) => {
-    let data = '';
-    req.on('data', chunk => { data += chunk; });
-    req.on('end', () => {
-      try { resolve(JSON.parse(data)); }
-      catch (e) { reject(new Error('Could not parse request body as JSON.')); }
-    });
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => resolve(Buffer.concat(chunks)));
     req.on('error', reject);
   });
 }
@@ -60,7 +52,7 @@ async function readBody(req) {
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Filename');
 
   if (req.method === 'OPTIONS') {
     res.status(200).end();
@@ -78,35 +70,23 @@ export default async function handler(req, res) {
     return;
   }
 
-  let body;
-  try {
-    body = await readBody(req);
-  } catch (err) {
-    res.status(400).json({ error: 'Invalid request body.', details: err.message });
-    return;
-  }
-
-  const { filename, url } = body || {};
-
-  if (!filename || !url) {
-    res.status(400).json({ error: 'Missing filename or url in request.' });
-    return;
-  }
+  const filename = decodeURIComponent(req.headers['x-filename'] || 'document.pdf');
 
   const controller = new AbortController();
   const abortTimer = setTimeout(() => controller.abort(), 50_000);
   const t0 = Date.now();
 
   try {
-    // Download the PDF inside the Vercel function so Anthropic receives bytes
-    // directly rather than fetching from the blob URL on its own network path.
-    const pdfFetch = await fetch(url, { signal: controller.signal });
-    if (!pdfFetch.ok) throw new Error(`Failed to fetch PDF from blob (${pdfFetch.status})`);
-    const pdfBuffer = await pdfFetch.arrayBuffer();
-    console.log(`[ingest] pdf_download_ms=${Date.now()-t0} bytes=${pdfBuffer.byteLength}`);
+    const pdfBuffer = await readRawBody(req);
+    console.log(`[ingest] pdf_received_bytes=${pdfBuffer.byteLength}`);
+
+    if (pdfBuffer.byteLength === 0) {
+      res.status(400).json({ error: 'Received empty PDF body.' });
+      return;
+    }
 
     const t1 = Date.now();
-    const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
+    const pdfBase64 = pdfBuffer.toString('base64');
     console.log(`[ingest] base64_encode_ms=${Date.now()-t1}`);
 
     const t2 = Date.now();
@@ -180,7 +160,5 @@ export default async function handler(req, res) {
     }
   } finally {
     clearTimeout(abortTimer);
-    // Clean up the blob regardless of success or failure
-    try { await del(url); } catch {}
   }
 }
