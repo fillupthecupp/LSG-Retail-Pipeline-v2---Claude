@@ -5,8 +5,8 @@ import {
   Trash2, ChevronDown, AlertCircle, CheckCircle2,
   Pencil, Save,
 } from 'lucide-react';
+import { supabase } from './lib/supabase';
 
-const STORAGE_KEY = 'lsg-pipeline-v1';
 const STAGES = ['Screening', 'Underwriting', 'Bid', 'Active', 'Dead'];
 const STAGE_COLORS = {
   Screening:    'bg-blue-50 text-blue-700 border-blue-200',
@@ -267,9 +267,8 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
 }
 
 export default function App() {
-  const [deals, setDeals] = useState(() => {
-    try { const r=localStorage.getItem(STORAGE_KEY); return r?JSON.parse(r):[]; } catch { return []; }
-  });
+  const [deals, setDeals] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('All');
   const [sortKey, setSortKey] = useState('dateAdded');
@@ -278,7 +277,17 @@ export default function App() {
   const [editDeal, setEditDeal] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
 
-  useEffect(() => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(deals)); } catch {} }, [deals]);
+  useEffect(() => {
+    supabase
+      .from('deals')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .then(({ data, error }) => {
+        if (error) console.error('Failed to load deals:', error);
+        setDeals(data || []);
+        setLoading(false);
+      });
+  }, []);
 
   const stats = useMemo(() => ({
     total: deals.length,
@@ -305,19 +314,36 @@ export default function App() {
     else { setSortKey(key); setSortDir('asc'); }
   }
 
-  function addDeal(form) {
-    setDeals(p=>[{...form, id:Date.now(), dateAdded:new Date().toISOString().slice(0,10)}, ...p]);
+  async function addDeal(form) {
     setShowAdd(false);
+    const { data, error } = await supabase
+      .from('deals')
+      .insert({ ...form, dateAdded: new Date().toISOString().slice(0, 10) })
+      .select()
+      .single();
+    if (error) { console.error('Failed to save deal:', error); return; }
+    setDeals(p => [data, ...p]);
   }
 
-  function saveDeal(form) {
-    setDeals(p=>p.map(d=>d.id===form.id?form:d));
+  async function saveDeal(form) {
+    setDeals(p => p.map(d => d.id === form.id ? form : d));
     setEditDeal(null);
+    const { id, created_at, updated_at, ...fields } = form;
+    const { error } = await supabase
+      .from('deals')
+      .update(fields)
+      .eq('id', id);
+    if (error) console.error('Failed to update deal:', error);
   }
 
-  function deleteDeal(id) {
-    setDeals(p=>p.filter(d=>d.id!==id));
+  async function deleteDeal(id) {
+    setDeals(p => p.filter(d => d.id !== id));
     setDeleteId(null);
+    const { error } = await supabase
+      .from('deals')
+      .delete()
+      .eq('id', id);
+    if (error) console.error('Failed to delete deal:', error);
   }
 
   return (
@@ -376,8 +402,12 @@ export default function App() {
             </div>
           </div>
 
-          {/* Empty state */}
-          {deals.length===0 ? (
+          {/* Loading / empty / table */}
+          {loading ? (
+            <div className="flex items-center justify-center py-20">
+              <span className="text-sm text-zinc-400">Loading pipeline…</span>
+            </div>
+          ) : deals.length===0 ? (
             <div className="flex flex-col items-center justify-center py-20 text-center">
               <div className="mb-4 text-5xl opacity-20">◫</div>
               <div className="text-base font-medium text-zinc-500">No deals yet</div>
