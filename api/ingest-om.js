@@ -93,13 +93,31 @@ export default async function handler(req, res) {
     return;
   }
 
+  const controller = new AbortController();
+  const abortTimer = setTimeout(() => controller.abort(), 50_000);
+  const t0 = Date.now();
+
   try {
+    // Download the PDF inside the Vercel function so Anthropic receives bytes
+    // directly rather than fetching from the blob URL on its own network path.
+    const pdfFetch = await fetch(url, { signal: controller.signal });
+    if (!pdfFetch.ok) throw new Error(`Failed to fetch PDF from blob (${pdfFetch.status})`);
+    const pdfBuffer = await pdfFetch.arrayBuffer();
+    console.log(`[ingest] pdf_download_ms=${Date.now()-t0} bytes=${pdfBuffer.byteLength}`);
+
+    const t1 = Date.now();
+    const pdfBase64 = Buffer.from(pdfBuffer).toString('base64');
+    console.log(`[ingest] base64_encode_ms=${Date.now()-t1}`);
+
+    const t2 = Date.now();
     const anthropicResp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': apiKey,
         'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'pdfs-2024-09-25',
       },
       body: JSON.stringify({
         model: 'claude-3-5-sonnet-20241022',
@@ -112,8 +130,9 @@ export default async function handler(req, res) {
               {
                 type: 'document',
                 source: {
-                  type: 'url',
-                  url,
+                  type: 'base64',
+                  media_type: 'application/pdf',
+                  data: pdfBase64,
                 },
               },
               {
@@ -125,6 +144,8 @@ export default async function handler(req, res) {
         ],
       }),
     });
+
+    console.log(`[ingest] anthropic_ms=${Date.now()-t2} status=${anthropicResp.status}`);
 
     const anthropicData = await anthropicResp.json();
 
@@ -143,15 +164,22 @@ export default async function handler(req, res) {
       return;
     }
 
+    const t3 = Date.now();
     const extracted = safeParseJson(rawText);
+    console.log(`[ingest] parse_ms=${Date.now()-t3} total_ms=${Date.now()-t0}`);
     res.status(200).json({ ok: true, extracted });
 
   } catch (err) {
-    res.status(500).json({
-      error: 'Unexpected server error.',
-      details: err?.message || String(err),
-    });
+    if (err.name === 'AbortError') {
+      res.status(504).json({ error: 'Extraction timed out. Try a smaller PDF (under 10 MB) or compress it first.' });
+    } else {
+      res.status(500).json({
+        error: 'Unexpected server error.',
+        details: err?.message || String(err),
+      });
+    }
   } finally {
+    clearTimeout(abortTimer);
     // Clean up the blob regardless of success or failure
     try { await del(url); } catch {}
   }
