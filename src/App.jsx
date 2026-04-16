@@ -1,24 +1,23 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Building2, Search, Plus, Upload, X, ArrowUpDown,
+  Search, Plus, Upload, X, ArrowUpDown,
   Trash2, ChevronDown, AlertCircle, CheckCircle2,
-  Pencil, Save,
+  Save,
 } from 'lucide-react';
 import { supabase } from './lib/supabase';
 import { fromDbRow, toDbRow } from './lib/dealMapper';
 
 const STAGES = ['Screening', 'Underwriting', 'Bid', 'Active', 'Dead'];
 const STAGE_COLORS = {
-  Screening:    'bg-blue-50 text-blue-700 border-blue-200',
-  Underwriting: 'bg-amber-50 text-amber-700 border-amber-200',
-  Bid:          'bg-yellow-50 text-yellow-700 border-yellow-200',
-  Active:       'bg-emerald-50 text-emerald-700 border-emerald-200',
-  Dead:         'bg-zinc-100 text-zinc-500 border-zinc-200',
+  Screening:    'bg-[#eff6ff] text-[#1e40af] border-[#bfdbfe]',
+  Underwriting: 'bg-[#fffbeb] text-[#92400e] border-[#fde68a]',
+  Bid:          'bg-[#fefce8] text-[#854d0e] border-[#fef08a]',
+  Active:       'bg-[#f0fdf4] text-[#15803d] border-[#bbf7d0]',
+  Dead:         'bg-[#f4f3f1] text-[#a8a5a1] border-[#d1cfc9]',
 };
 const ASSET_TYPES = ['Power Center','Strip Center','Grocery-Anchored','Super-Regional Mall','Regional Mall','Neighborhood Center','Net Lease','Other'];
 const PIPELINE_COLUMNS = [
-  { key: 'propertyName',       label: 'Property',       width: 'min-w-[180px]' },
-  { key: 'propertyAddress',    label: 'Address',        width: 'min-w-[200px]' },
+  { key: 'propertyName',       label: 'Property',       width: 'min-w-[200px]' },
   { key: 'market',             label: 'Market',         width: 'min-w-[130px]' },
   { key: 'assetType',          label: 'Type',           width: 'min-w-[140px]' },
   { key: 'sf',                 label: 'GLA (SF)',       width: 'min-w-[100px]' },
@@ -27,9 +26,9 @@ const PIPELINE_COLUMNS = [
   { key: 'parkingCount',       label: 'Parking',        width: 'min-w-[85px]'  },
   { key: 'occupancy',          label: 'Occupancy',      width: 'min-w-[95px]'  },
   { key: 'walt',               label: 'WALT',           width: 'min-w-[75px]'  },
-  { key: 'askingPrice',        label: 'Purchase Price',      width: 'min-w-[140px]' },
-  { key: 'noi',                label: 'NOI',                 width: 'min-w-[115px]' },
-  { key: 'capRate',            label: 'Going-In Cap',        width: 'min-w-[115px]' },
+  { key: 'askingPrice',        label: 'Purchase Price', width: 'min-w-[140px]' },
+  { key: 'noi',                label: 'NOI',            width: 'min-w-[115px]' },
+  { key: 'capRate',            label: 'Going-In Cap',   width: 'min-w-[115px]' },
   { key: 'broker',             label: 'Broker',         width: 'min-w-[150px]' },
   { key: 'keyAnchors',         label: 'Key Anchors',    width: 'min-w-[170px]' },
   { key: 'bidDate',            label: 'Bid Date',       width: 'min-w-[105px]' },
@@ -59,29 +58,94 @@ function getSortValue(deal, key) {
 
 function StageBadge({ stage }) {
   return (
-    <span className={cn('inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium', STAGE_COLORS[stage]||STAGE_COLORS.Screening)}>
+    <span className={cn(
+      'inline-flex items-center rounded-[3px] border px-[6px] py-[2px] text-[9px] font-bold tracking-[.04em] uppercase',
+      STAGE_COLORS[stage] || STAGE_COLORS.Screening
+    )}>
       {stage}
     </span>
   );
 }
 
-function StatCard({ label, value }) {
+// ── SUPPORT TAB COMPONENTS ──────────────────────────────────────────────────
+
+function SupportCard({ title, children, defaultOpen = true }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm">
-      <div className="text-xs font-medium uppercase tracking-widest text-zinc-500">{label}</div>
-      <div className="mt-2 text-3xl font-semibold text-zinc-900">{value}</div>
+    <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden',boxShadow:'var(--sh)'}}>
+      <button
+        onClick={()=>setOpen(o=>!o)}
+        style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'var(--surface2)',border:'none',borderBottom: open ? '1px solid var(--border)' : 'none',cursor:'pointer',textAlign:'left'}}
+      >
+        <div style={{width:6,height:6,borderRadius:'50%',background: open ? '#16a34a' : 'var(--border2)',flexShrink:0,transition:'background .2s'}}/>
+        <span style={{fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--muted)',flex:1}}>{title}</span>
+        <ChevronDown style={{width:12,height:12,color:'var(--dim)',transform: open ? 'rotate(180deg)' : 'none',transition:'transform .2s',flexShrink:0}}/>
+      </button>
+      {open && <div style={{padding:'16px'}}>{children}</div>}
     </div>
   );
 }
 
+function HurdlesFields() {
+  const DEFAULTS = {goingInCap:'6.5%',leveredIRR:'15.0%',cashOnCash:'8.0%',debtYield:'9.0%',dscr:'1.25x',maxLTV:'65%',assumedRate:'6.5%',assumedLTV:'60%'};
+  const [h, setH] = useState({...DEFAULTS});
+  const setVal = (k,v) => setH(p=>({...p,[k]:v}));
+  const HF = ({k, label, hint}) => (
+    <div style={{display:'flex',flexDirection:'column',gap:3}}>
+      <div style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--muted)'}}>{label}</div>
+      <input value={h[k]} onChange={e=>setVal(k,e.target.value)}
+        style={{background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:'5px',padding:'7px 10px',fontSize:'13px',fontWeight:600,fontFamily:'inherit',color:'var(--text)',outline:'none',textAlign:'center',width:'100%',transition:'border-color .15s'}}
+        onFocus={e=>e.target.style.borderColor='var(--accent)'}
+        onBlur={e=>e.target.style.borderColor='var(--border2)'}
+      />
+      <div style={{fontSize:'9px',color:'var(--dim)',textAlign:'center'}}>{hint}</div>
+    </div>
+  );
+  return (
+    <div>
+      <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10,marginBottom:14}}>
+        <HF k="goingInCap"  label="Going-In Cap"  hint="min. cap rate"/>
+        <HF k="leveredIRR"  label="Levered IRR"   hint="hurdle return"/>
+        <HF k="cashOnCash"  label="Cash-on-Cash"  hint="year 1 CoC"/>
+        <HF k="debtYield"   label="Debt Yield"    hint="NOI / loan"/>
+        <HF k="dscr"        label="DSCR"          hint="min. coverage"/>
+        <HF k="maxLTV"      label="Max LTV"       hint="loan-to-value"/>
+        <HF k="assumedRate" label="Assumed Rate"  hint="interest rate"/>
+        <HF k="assumedLTV"  label="Assumed LTV"   hint="underwrite LTV"/>
+      </div>
+      <div className="flex items-center gap-3">
+        <button onClick={()=>setH({...DEFAULTS})}
+          style={{padding:'5px 12px',borderRadius:'5px',fontSize:'11px',fontWeight:600,cursor:'pointer',border:'1px solid var(--border2)',background:'var(--surface2)',color:'var(--muted)',transition:'all .15s'}}
+          onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.color='var(--accent)';}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border2)';e.currentTarget.style.color='var(--muted)';}}
+        >Reset to Defaults</button>
+        <span style={{fontSize:'10px',color:'var(--dim)'}}>Screener integration is planned for a future phase. These values are reference defaults.</span>
+      </div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+
+function StatCard({ label, value }) {
+  return (
+    <div className="rounded-[8px] border border-[#e5e3df] bg-[#f4f3f1] px-3 py-[10px]" style={{boxShadow:'var(--sh)'}}>
+      <div className="text-[9px] font-bold uppercase tracking-[.08em] text-[#a8a5a1]">{label}</div>
+      <div className="mt-[3px] text-[18px] font-bold text-[#1a1917]">{value}</div>
+    </div>
+  );
+}
+
+// Shared input/select class
+const INPUT_CLS = 'w-full rounded-[5px] border border-[#d1cfc9] bg-[#f4f3f1] px-[10px] py-[7px] text-[12px] text-[#1a1917] outline-none focus:border-[#1a1917] transition-colors';
+
 function FF({ label, value, onChange, placeholder, type='text', multiline=false, children }) {
-  const base = 'w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100';
   return (
     <label className="block">
-      <div className="mb-1.5 text-xs font-medium uppercase tracking-widest text-zinc-500">{label}</div>
+      <div className="mb-[4px] text-[10px] font-bold uppercase tracking-[.06em] text-[#6b6864]">{label}</div>
       {children ? children : multiline
-        ? <textarea className={cn(base,'min-h-[80px] resize-y')} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/>
-        : <input className={base} type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/>
+        ? <textarea className={cn(INPUT_CLS, 'min-h-[80px] resize-y')} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/>
+        : <input className={INPUT_CLS} type={type} value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder}/>
       }
     </label>
   );
@@ -141,7 +205,6 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
     if (!omFile) return;
     setIngesting(true); setIngestError(''); setIngestDone(false); setMissing([]);
     try {
-      // Read PDF as base64 in the browser — no server upload for fast-pass
       const pdfBase64 = await new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result.split(',')[1]);
@@ -162,7 +225,7 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         body: JSON.stringify({
-          model: 'claude-3-5-sonnet-20241022',
+          model: 'claude-haiku-4-5-20251001',
           max_tokens: 1024,
           system: FAST_PASS_PROMPT,
           messages: [{
@@ -198,7 +261,6 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
         walt:            ex.walt            || p.walt,
         broker:          ex.broker          || p.broker,
         keyAnchors:      ex.keyAnchors      || p.keyAnchors,
-        // askingPrice and capRate are analyst-owned — never auto-filled
         notes: highlights.length > 0 ? highlights.map(h => `• ${h}`).join('\n') : p.notes,
         stage: 'Screening',
         sourceFiles: [...(p.sourceFiles || []), omFile.name],
@@ -211,87 +273,125 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/50 p-4">
-      <div className="flex w-full max-w-2xl flex-col rounded-3xl border border-zinc-200 bg-white shadow-2xl max-h-[92vh]">
-        <div className="flex items-center justify-between border-b border-zinc-100 px-6 py-5 flex-shrink-0">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:'rgba(0,0,0,.45)'}}>
+      <div className="flex w-full max-w-2xl flex-col max-h-[85vh]" style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',boxShadow:'var(--sh-lg)'}}>
+
+        {/* Modal header */}
+        <div className="flex items-center justify-between flex-shrink-0" style={{padding:'14px 18px',borderBottom:'1px solid var(--border)'}}>
           <div>
-            <div className="text-lg font-semibold text-zinc-900">{title}</div>
-            {subtitle && <div className="mt-0.5 text-sm text-zinc-500">{subtitle}</div>}
+            <div style={{fontSize:'15px',fontWeight:600,color:'var(--text)'}}>{title}</div>
+            {subtitle && <div style={{fontSize:'11px',color:'var(--muted)',marginTop:'2px'}}>{subtitle}</div>}
           </div>
-          <button onClick={onClose} className="rounded-xl p-2 text-zinc-400 hover:bg-zinc-100"><X className="h-5 w-5"/></button>
+          <button onClick={onClose} style={{background:'none',border:'none',cursor:'pointer',color:'var(--dim)',fontSize:'20px',lineHeight:1,padding:'2px 6px'}}
+            onMouseEnter={e=>e.currentTarget.style.color='var(--text)'}
+            onMouseLeave={e=>e.currentTarget.style.color='var(--dim)'}
+          >✕</button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
+        {/* Modal body */}
+        <div className="overflow-y-auto flex-1 space-y-4" style={{padding:'16px 18px'}}>
+
+          {/* OM Ingest card */}
           {showIngest && (
-            <div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-4 space-y-3">
-              <div className="text-xs font-medium uppercase tracking-widest text-zinc-500">OM Upload — AI Extract (optional)</div>
-              <div className="flex flex-wrap items-center gap-3">
-                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50">
-                  <Upload className="h-4 w-4"/>
-                  Choose PDF
+            <div style={{border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden',boxShadow:'var(--sh)'}}>
+              <div className="flex items-center gap-2" style={{padding:'10px 14px',borderBottom:'1px solid var(--border)',background:'var(--surface2)'}}>
+                <div style={{width:6,height:6,borderRadius:'50%',background: ingesting ? '#b45309' : ingestDone && !ingestError ? '#16a34a' : 'var(--border2)',flexShrink:0,transition:'background .2s'}}/>
+                <span style={{fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--muted)'}}>
+                  OM Upload — AI Extract
+                </span>
+                <span style={{fontSize:'10px',color:'var(--dim)',marginLeft:'auto'}}>optional</span>
+              </div>
+
+              <div className="space-y-3" style={{padding:'14px'}}>
+                {/* Drop zone / file selector */}
+                <label style={{
+                  display:'block',border:'1.5px dashed var(--border2)',borderRadius:'8px',
+                  padding:'20px',textAlign:'center',cursor:'pointer',
+                  background: omFile ? 'var(--surface)' : 'var(--surface2)',
+                  transition:'all .2s',
+                }}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--accent)';e.currentTarget.style.background='var(--surface3)';}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border2)';e.currentTarget.style.background=omFile?'var(--surface)':'var(--surface2)';}}
+                >
+                  {omFile ? (
+                    <div>
+                      <div style={{fontSize:'12px',fontWeight:600,color:'var(--text)'}}>{omFile.name}</div>
+                      <div style={{fontSize:'10px',color:'var(--dim)',marginTop:'3px'}}>{(omFile.size/1024/1024).toFixed(1)} MB — click to change</div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{fontSize:'26px',marginBottom:'6px',opacity:.35}}>📄</div>
+                      <div style={{fontSize:'12px',color:'var(--muted)'}}>Click to choose a PDF</div>
+                      <div style={{fontSize:'10px',color:'var(--dim)',marginTop:'3px'}}>Up to 50 MB · offering memoranda only</div>
+                    </div>
+                  )}
                   <input type="file" accept=".pdf" className="hidden" onChange={e=>{
                     const file = e.target.files?.[0];
                     setIngestDone(false); setIngestError(''); setIngestWarn('');
                     if (file) {
-                      if (file.size > 50 * 1024 * 1024) { // 50 MB hard limit
+                      if (file.size > 50 * 1024 * 1024) {
                         setIngestError('File is too large (over 50 MB). Please choose a smaller PDF or compress it.');
                         setOmFile(null);
                       } else {
                         setOmFile(file);
-                        if (file.size > 25 * 1024 * 1024) {
-                          setIngestWarn('Large file — extraction may be slow.');
-                        }
+                        if (file.size > 25 * 1024 * 1024) setIngestWarn('Large file — extraction may be slow.');
                       }
-                    } else {
-                      setOmFile(null);
-                    }
+                    } else { setOmFile(null); }
                   }}/>
                 </label>
-                {omFile && (
-                  <span className="text-sm text-zinc-600 truncate max-w-[180px]">
-                    {omFile.name}
-                    <span className="ml-1 text-zinc-400 font-normal">({(omFile.size / 1024 / 1024).toFixed(1)} MB)</span>
-                  </span>
-                )}
+
+                {/* Extract button */}
                 <button
                   onClick={handleIngest}
-                  disabled={!omFile||ingesting}
-                  className={cn('inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition',
-                    !omFile||ingesting ? 'cursor-not-allowed bg-zinc-300' : 'bg-zinc-900 hover:bg-zinc-700'
-                  )}
+                  disabled={!omFile || ingesting}
+                  style={{
+                    display:'inline-flex',alignItems:'center',gap:'6px',
+                    padding:'7px 13px',borderRadius:'5px',fontSize:'12px',fontWeight:500,
+                    cursor: !omFile||ingesting ? 'not-allowed' : 'pointer',
+                    background: !omFile||ingesting ? 'var(--border2)' : 'var(--accent)',
+                    color:'#fff',border:'none',transition:'all .15s',
+                    opacity: !omFile||ingesting ? .6 : 1,
+                  }}
                 >
                   {ingesting
-                    ? <><span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"/>Extracting...</>
-                    : <>Extract with AI</>
+                    ? <><span style={{width:12,height:12,border:'1.5px solid rgba(255,255,255,.4)',borderTopColor:'#fff',borderRadius:'50%',display:'inline-block',animation:'spin .6s linear infinite'}}/>Extracting…</>
+                    : <><Upload style={{width:12,height:12}}/>Extract with AI</>
                   }
                 </button>
+
+                {/* Feedback strips */}
+                {ingestError && (
+                  <div className="flex items-start gap-2" style={{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'5px',padding:'8px 10px',fontSize:'11px',color:'#991b1b'}}>
+                    <AlertCircle style={{width:14,height:14,flexShrink:0,marginTop:1}}/>
+                    {ingestError}
+                  </div>
+                )}
+                {ingestWarn && !ingestError && (
+                  <div className="flex items-start gap-2" style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'5px',padding:'8px 10px',fontSize:'11px',color:'#92400e'}}>
+                    <AlertCircle style={{width:14,height:14,flexShrink:0,marginTop:1}}/>
+                    {ingestWarn}
+                  </div>
+                )}
+                {ingestDone && !ingestError && (
+                  <div className="flex flex-wrap items-start gap-2" style={{background:'#f0fdf4',border:'1px solid #bbf7d0',borderRadius:'5px',padding:'8px 10px',fontSize:'11px',color:'#15803d'}}>
+                    <CheckCircle2 style={{width:14,height:14,flexShrink:0,marginTop:1}}/>
+                    <span>Fields extracted. Review below and fill any gaps.
+                      {missing.length > 0 && <span style={{color:'#92400e',marginLeft:6}}>Missing: {missing.join(', ')}</span>}
+                    </span>
+                  </div>
+                )}
               </div>
-              {ingestError && (
-                <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0"/>{ingestError}
-                </div>
-              )}
-              {ingestWarn && !ingestError && (
-                <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
-                  <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0"/>{ingestWarn}
-                </div>
-              )}
-              {ingestDone && !ingestError && (
-                <div className="flex flex-wrap items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0"/>
-                  <span>Fields extracted. Review below and fill any gaps.{missing.length > 0 && <span className="ml-1 text-amber-700">Missing: {missing.join(', ')}</span>}</span>
-                </div>
-              )}
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
+          {/* Deal fields */}
+          <div className="grid gap-3 md:grid-cols-2">
             <FF label="Property Name" value={form.propertyName} onChange={v=>set('propertyName',v)} placeholder="Promenade at Casa Grande"/>
             <FF label="Property Address" value={form.propertyAddress} onChange={v=>set('propertyAddress',v)} placeholder="1005 N Promenade Pkwy, Casa Grande, AZ"/>
             <FF label="Market" value={form.market} onChange={v=>set('market',v)} placeholder="Phoenix, AZ"/>
             <FF label="Asset Type" value={form.assetType} onChange={v=>set('assetType',v)}>
-              <select className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400" value={form.assetType} onChange={e=>set('assetType',e.target.value)}>
-                <option value="">Select type...</option>
+              <select className={INPUT_CLS} value={form.assetType} onChange={e=>set('assetType',e.target.value)}>
+                <option value="">Select type…</option>
                 {ASSET_TYPES.map(t=><option key={t}>{t}</option>)}
               </select>
             </FF>
@@ -308,21 +408,30 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
             <FF label="Key Anchors" value={form.keyAnchors} onChange={v=>set('keyAnchors',v)} placeholder="Ross, Marshalls, HomeGoods"/>
             <FF label="Bid Date" value={form.bidDate} onChange={v=>set('bidDate',v)} type="date"/>
             <FF label="Stage" value={form.stage} onChange={v=>set('stage',v)}>
-              <select className="w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-900 outline-none focus:border-zinc-400" value={form.stage} onChange={e=>set('stage',e.target.value)}>
+              <select className={INPUT_CLS} value={form.stage} onChange={e=>set('stage',e.target.value)}>
                 {STAGES.map(s=><option key={s}>{s}</option>)}
               </select>
             </FF>
           </div>
-          <FF label="Notes" value={form.notes} onChange={v=>set('notes',v)} placeholder="IC thesis, open items, sourcing context..." multiline/>
+          <FF label="Notes" value={form.notes} onChange={v=>set('notes',v)} placeholder="IC thesis, open items, sourcing context…" multiline/>
         </div>
 
-        <div className="flex items-center justify-end gap-3 border-t border-zinc-100 px-6 py-4 flex-shrink-0">
-          <button onClick={onClose} className="rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</button>
-          <button onClick={()=>onSave(form)} className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700">
-            <Save className="h-4 w-4"/> Save Deal
+        {/* Modal footer */}
+        <div className="flex items-center justify-end gap-2 flex-shrink-0" style={{padding:'12px 18px',borderTop:'1px solid var(--border)'}}>
+          <button onClick={onClose} style={{padding:'7px 13px',borderRadius:'5px',fontSize:'12px',fontWeight:500,background:'var(--surface)',color:'var(--text)',border:'1px solid var(--border)',cursor:'pointer',transition:'all .15s'}}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
+            onMouseLeave={e=>e.currentTarget.style.background='var(--surface)'}
+          >Cancel</button>
+          <button onClick={()=>onSave(form)} className="inline-flex items-center gap-[5px]" style={{padding:'7px 13px',borderRadius:'5px',fontSize:'12px',fontWeight:500,background:'var(--accent)',color:'#fff',border:'none',cursor:'pointer',transition:'all .15s'}}
+            onMouseEnter={e=>e.currentTarget.style.background='#2d2b28'}
+            onMouseLeave={e=>e.currentTarget.style.background='var(--accent)'}
+          >
+            <Save style={{width:13,height:13}}/> Save Deal
           </button>
         </div>
       </div>
+
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
@@ -334,6 +443,7 @@ export default function App() {
   const [stageFilter, setStageFilter] = useState('All');
   const [sortKey, setSortKey] = useState('dateAdded');
   const [sortDir, setSortDir] = useState('desc');
+  const [activeTab, setActiveTab] = useState('PIPELINE');
   const [showAdd, setShowAdd] = useState(false);
   const [editDeal, setEditDeal] = useState(null);
   const [deleteId, setDeleteId] = useState(null);
@@ -407,126 +517,380 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 text-zinc-900">
+    <div style={{minHeight:'100vh',background:'var(--bg)',color:'var(--text)'}}>
 
       {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white">
-        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-zinc-900 text-white shadow-sm">
-              <Building2 className="h-5 w-5"/>
-            </div>
+      <header style={{background:'var(--surface)',borderBottom:'1px solid var(--border)',position:'sticky',top:0,zIndex:40,boxShadow:'var(--sh)'}}>
+        <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-4" style={{padding:'0 24px',height:'54px'}}>
+          <div className="flex items-center gap-[10px]">
+            <div style={{width:30,height:30,background:'var(--accent)',borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,color:'#fff',flexShrink:0}}>L</div>
             <div>
-              <div className="text-base font-semibold">LSG Retail Pipeline</div>
-              <div className="text-xs text-zinc-500">Lightstone Group · Acquisitions</div>
+              <div style={{fontSize:'15px',fontWeight:600}}>Lightstone</div>
+              <div style={{fontSize:'10px',color:'var(--dim)',marginTop:1}}>Retail Pipeline · Acquisitions</div>
             </div>
           </div>
-          <button onClick={()=>setShowAdd(true)} className="inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-zinc-700 transition">
-            <Plus className="h-4 w-4"/> Add Deal
+          <button
+            onClick={()=>setShowAdd(true)}
+            className="inline-flex items-center gap-[5px]"
+            style={{padding:'7px 13px',borderRadius:'5px',fontSize:'12px',fontWeight:500,background:'var(--accent)',color:'#fff',border:'none',cursor:'pointer',transition:'all .15s'}}
+            onMouseEnter={e=>e.currentTarget.style.background='#2d2b28'}
+            onMouseLeave={e=>e.currentTarget.style.background='var(--accent)'}
+          >
+            <Plus style={{width:13,height:13}}/> Add Deal
           </button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-screen-2xl space-y-6 px-6 py-6">
+      <main className="mx-auto max-w-screen-2xl space-y-5" style={{padding:'20px 24px'}}>
+
+        {/* Tab strip */}
+        <div style={{display:'flex',gap:0,borderBottom:'1px solid var(--border)',marginBottom:0}}>
+          {['PIPELINE','COMPARE','SUPPORT'].map(tab => (
+            <button key={tab} onClick={()=>setActiveTab(tab)}
+              style={{
+                padding:'8px 16px',fontSize:'11px',fontWeight:600,cursor:'pointer',
+                borderBottom: activeTab===tab ? '2px solid var(--accent)' : '2px solid transparent',
+                marginBottom:-1,
+                color: activeTab===tab ? 'var(--text)' : 'var(--muted)',
+                background:'none',border:'none',
+                borderBottomStyle:'solid',
+                borderBottomWidth:2,
+                borderBottomColor: activeTab===tab ? 'var(--accent)' : 'transparent',
+                textTransform:'uppercase',letterSpacing:'.06em',
+                transition:'all .15s',
+              }}
+            >{tab}</button>
+          ))}
+        </div>
+
+        {activeTab === 'COMPARE' && (
+          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',padding:'40px',textAlign:'center',boxShadow:'var(--sh)'}}>
+            <div style={{fontSize:'32px',marginBottom:8,opacity:.25}}>⇌</div>
+            <div style={{fontSize:'12px',fontWeight:500,color:'var(--muted)'}}>Compare view coming soon</div>
+            <div style={{fontSize:'11px',color:'var(--dim)',marginTop:4}}>Side-by-side deal comparison will appear here.</div>
+          </div>
+        )}
+
+        {activeTab === 'SUPPORT' && (
+          <div className="space-y-3">
+
+            {/* 1. SCREENING HURDLES */}
+            <SupportCard title="Screening Hurdles">
+              <HurdlesFields />
+            </SupportCard>
+
+            {/* 2. SUPABASE SETUP GUIDE */}
+            <SupportCard title="Supabase Setup Guide">
+              <div style={{display:'flex',flexDirection:'column',gap:16,fontSize:'12px',lineHeight:1.6,color:'var(--text)'}}>
+
+                <div>
+                  <div style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--muted)',marginBottom:6}}>Step 1 — Create a Supabase project</div>
+                  <p style={{color:'var(--muted)'}}>Go to <span style={{fontWeight:600,color:'var(--text)'}}>supabase.com</span> → New project. Choose a region close to your users. Once created, note your <strong>Project URL</strong> and <strong>anon/public key</strong> from Settings → API.</p>
+                </div>
+
+                <div>
+                  <div style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--muted)',marginBottom:6}}>Step 2 — Create the deals table</div>
+                  <p style={{color:'var(--muted)',marginBottom:8}}>Open the SQL Editor in your Supabase dashboard and run:</p>
+                  <pre style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px',fontFamily:'monospace',fontSize:'10px',color:'var(--muted)',overflowX:'auto',whiteSpace:'pre',lineHeight:1.7,margin:0}}>{`CREATE TABLE deals (
+  id                   uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  created_at           timestamptz DEFAULT now(),
+  property_name        text,
+  property_address     text,
+  market               text,
+  asset_type           text,
+  sf                   text,
+  acreage              text,
+  year_built_renovated text,
+  parking_count        text,
+  occupancy            text,
+  walt                 text,
+  asking_price         text,
+  noi                  text,
+  cap_rate             text,
+  broker               text,
+  key_anchors          text,
+  bid_date             date,
+  stage                text DEFAULT 'Screening',
+  notes                text,
+  raw_data             jsonb,
+  source_files         text[]
+);`}</pre>
+                </div>
+
+                <div>
+                  <div style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--muted)',marginBottom:6}}>Step 3 — Row Level Security (RLS)</div>
+                  <p style={{color:'var(--muted)',marginBottom:8}}>For an internal team tool with no user auth, the simplest path is to disable RLS entirely. If you need auth-gated access, use Option B.</p>
+                  <pre style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px',fontFamily:'monospace',fontSize:'10px',color:'var(--muted)',overflowX:'auto',whiteSpace:'pre',lineHeight:1.7,margin:0}}>{`-- Option A: disable RLS (internal tool, no auth)
+ALTER TABLE deals DISABLE ROW LEVEL SECURITY;
+
+-- Option B: enable with permissive policy (authenticated users)
+ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "team_access" ON deals
+  FOR ALL USING (true) WITH CHECK (true);`}</pre>
+                </div>
+
+                <div>
+                  <div style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--muted)',marginBottom:6}}>Step 4 — Add credentials to the app</div>
+                  <p style={{color:'var(--muted)',marginBottom:8}}>Add both values to <code style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 5px',fontSize:'10px'}}>`.env.local`</code> for local dev and to Vercel Environment Variables for production:</p>
+                  <pre style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px',fontFamily:'monospace',fontSize:'10px',color:'var(--muted)',overflowX:'auto',whiteSpace:'pre',lineHeight:1.7,margin:0}}>{`VITE_SUPABASE_URL=https://your-project-ref.supabase.co
+VITE_SUPABASE_ANON_KEY=eyJhbGciOi...`}</pre>
+                  <p style={{color:'var(--dim)',fontSize:'11px',marginTop:8}}>These are read by <code style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 5px',fontSize:'10px'}}>src/lib/supabase.js</code> at build time via Vite's <code style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 5px',fontSize:'10px'}}>import.meta.env</code>.</p>
+                </div>
+
+              </div>
+            </SupportCard>
+
+            {/* 3. GETTING YOUR ANTHROPIC API KEY */}
+            <SupportCard title="Getting Your Anthropic API Key">
+              <div style={{display:'flex',flexDirection:'column',gap:16,fontSize:'12px',lineHeight:1.6,color:'var(--text)'}}>
+
+                <div>
+                  <div style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--muted)',marginBottom:6}}>Step 1 — Create or sign into your Anthropic account</div>
+                  <p style={{color:'var(--muted)'}}>Go to <span style={{fontWeight:600,color:'var(--text)'}}>console.anthropic.com</span> and sign up or log in.</p>
+                </div>
+
+                <div>
+                  <div style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--muted)',marginBottom:6}}>Step 2 — Generate an API key</div>
+                  <p style={{color:'var(--muted)'}}>In the Console, go to <strong>API Keys</strong> → <strong>Create Key</strong>. Copy the key immediately — it will not be shown again.</p>
+                </div>
+
+                <div>
+                  <div style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--muted)',marginBottom:6}}>Step 3 — Add a payment method</div>
+                  <p style={{color:'var(--muted)'}}>Go to <strong>Settings → Billing</strong> and add a credit card. PDF extraction uses Claude Haiku, which is very low cost — typically a few cents per document.</p>
+                </div>
+
+                <div>
+                  <div style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--muted)',marginBottom:6}}>Step 4 — Add the key to the app</div>
+                  <p style={{color:'var(--muted)',marginBottom:8}}>The fast-pass extraction calls the Anthropic API <strong>directly from the browser</strong> using the key prefixed with <code style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 5px',fontSize:'10px'}}>VITE_</code>:</p>
+                  <pre style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px',fontFamily:'monospace',fontSize:'10px',color:'var(--muted)',overflowX:'auto',whiteSpace:'pre',lineHeight:1.7,margin:0}}>{`# .env.local (local dev)
+VITE_ANTHROPIC_API_KEY=sk-ant-...
+
+# Also add to Vercel → Settings → Environment Variables
+# (Production + Preview environments)`}</pre>
+                  <p style={{color:'var(--dim)',fontSize:'11px',marginTop:8}}>The request includes <code style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 5px',fontSize:'10px'}}>anthropic-dangerous-direct-browser-access: true</code>, which Anthropic requires to allow browser-origin API calls. A second key without the <code style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 5px',fontSize:'10px'}}>VITE_</code> prefix (<code style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 5px',fontSize:'10px'}}>ANTHROPIC_API_KEY</code>) is reserved for the future server-side full-ingest route in <code style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:3,padding:'1px 5px',fontSize:'10px'}}>api/ingest-om.js</code>.</p>
+                </div>
+
+                <div style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'5px',padding:'10px 12px'}}>
+                  <div style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'#92400e',marginBottom:4}}>Security — keep this key private</div>
+                  <p style={{fontSize:'11px',color:'#92400e',lineHeight:1.55}}>Because the key is included in the browser bundle via <code style={{background:'rgba(0,0,0,.06)',borderRadius:2,padding:'1px 4px',fontSize:'10px'}}>VITE_</code>, anyone who inspects the network traffic or bundle source can read it. For a closed internal tool this is acceptable — but never commit <code style={{background:'rgba(0,0,0,.06)',borderRadius:2,padding:'1px 4px',fontSize:'10px'}}>.env.local</code> to git, and rotate the key immediately if it is ever exposed publicly. Add <code style={{background:'rgba(0,0,0,.06)',borderRadius:2,padding:'1px 4px',fontSize:'10px'}}>.env.local</code> to <code style={{background:'rgba(0,0,0,.06)',borderRadius:2,padding:'1px 4px',fontSize:'10px'}}>.gitignore</code> if it is not there already.</p>
+                </div>
+
+              </div>
+            </SupportCard>
+
+            {/* 4. PROJECT STATUS & NEXT STEPS */}
+            <SupportCard title="Project Status & Next Steps">
+              <div style={{display:'flex',flexDirection:'column',gap:14,fontSize:'12px',lineHeight:1.6}}>
+
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+
+                  <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px'}}>
+                    <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:6}}>Current Status</div>
+                    <div style={{fontSize:'13px',fontWeight:700,color:'var(--text)',marginBottom:4}}>Refinement / Validation</div>
+                    <p style={{fontSize:'11px',color:'var(--muted)'}}>Pipeline foundation is working end-to-end. Current focus is UI polish, fast-pass extraction validation, and workflow refinements before broader use.</p>
+                  </div>
+
+                  <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px'}}>
+                    <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:6}}>Active Workstream</div>
+                    <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                      {['UI polish pass — LSG Deal Ingest visual language','Fast-pass OM extraction (browser → Anthropic)','Tab structure: Pipeline · Compare · Support','Collapsible support cards (this view)'].map(item => (
+                        <div key={item} className="flex items-start gap-2">
+                          <div style={{width:5,height:5,borderRadius:'50%',background:'#16a34a',flexShrink:0,marginTop:5}}/>
+                          <span style={{fontSize:'11px',color:'var(--muted)'}}>{item}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+
+                <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px'}}>
+                  <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:8}}>What Is Working Now</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 16px'}}>
+                    {[
+                      'Pipeline table with sort, search, filter',
+                      'Manual CRUD (add, edit, delete)',
+                      'Supabase persistence',
+                      'Fast-pass OM extraction (browser-side)',
+                      'Stage badges and deal metadata',
+                      'Row-click to edit',
+                      'Delete with confirmation',
+                      'PIPELINE / COMPARE / SUPPORT tabs',
+                    ].map(item => (
+                      <div key={item} className="flex items-start gap-2">
+                        <div style={{width:5,height:5,borderRadius:'50%',background:'#16a34a',flexShrink:0,marginTop:5}}/>
+                        <span style={{fontSize:'11px',color:'var(--muted)'}}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px'}}>
+                  <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:8}}>Immediate Next Steps</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                    {[
+                      ['Test fast-pass extraction with real OMs — validate field population and missing-field handling'],
+                      ['Add VITE_ANTHROPIC_API_KEY to Vercel environment variables (Production + Preview)'],
+                      ['Validate Supabase persistence round-trip for all field types including raw_data JSONB'],
+                      ['Smoke test the full add-deal → extract → review → save → pipeline flow'],
+                    ].map(([item],i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span style={{fontSize:'9px',fontWeight:700,color:'var(--accent)',flexShrink:0,marginTop:2,minWidth:14}}>{String(i+1).padStart(2,'0')}</span>
+                        <span style={{fontSize:'11px',color:'var(--muted)'}}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px'}}>
+                  <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:8}}>Deferred / Later</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:4}}>
+                    {[
+                      'Full ingest (Stage 2) — server-side PDF → Anthropic via api/ingest-om.js, enriching raw_data beyond fast-pass fields',
+                      'Compare flow — side-by-side deal comparison (tab placeholder exists)',
+                      'Screener — deal screening against hurdle rates (hurdle config shown above)',
+                      'One-pager generation — IC-ready deal summary export',
+                      'Auth / access control — Supabase RLS with team login',
+                    ].map((item,i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <div style={{width:5,height:5,borderRadius:'50%',background:'var(--border2)',flexShrink:0,marginTop:5}}/>
+                        <span style={{fontSize:'11px',color:'var(--dim)'}}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{display:'flex',justifyContent:'flex-end'}}>
+                  <span style={{fontSize:'10px',color:'var(--dim)'}}>Last updated: April 16, 2026</span>
+                </div>
+
+              </div>
+            </SupportCard>
+
+          </div>
+        )}
+
+        {activeTab === 'PIPELINE' && <>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard label="Total Deals"  value={stats.total}/>
-          <StatCard label="Active"        value={stats.active}/>
-          <StatCard label="At Bid"        value={stats.bid}/>
-          <StatCard label="Screening"     value={stats.screening}/>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <StatCard label="Total Deals" value={stats.total}/>
+          <StatCard label="Active"       value={stats.active}/>
+          <StatCard label="At Bid"       value={stats.bid}/>
+          <StatCard label="Screening"    value={stats.screening}/>
         </div>
 
         {/* Table card */}
-        <div className="rounded-2xl border border-zinc-200 bg-white shadow-sm">
+        <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden',boxShadow:'var(--sh)'}}>
+
           {/* Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-100 px-5 py-4">
-            <div className="text-sm font-semibold text-zinc-900">
-              Pipeline
-              <span className="ml-2 text-sm font-normal text-zinc-400">{filtered.length} deal{filtered.length!==1?'s':''}</span>
+          <div className="flex flex-wrap items-center justify-between gap-3" style={{padding:'10px 14px',borderBottom:'1px solid var(--border)'}}>
+            <div className="flex items-center gap-2">
+              <div style={{width:6,height:6,borderRadius:'50%',flexShrink:0,background: deals.length > 0 ? '#16a34a' : 'var(--border2)',transition:'background .3s'}}/>
+              <span style={{fontSize:'11px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--muted)'}}>Pipeline</span>
+              <span style={{fontSize:'11px',color:'var(--dim)'}}>{filtered.length} deal{filtered.length!==1?'s':''}</span>
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                <Search className="h-3.5 w-3.5 text-zinc-400 flex-shrink-0"/>
-                <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search deals..."
-                  className="w-44 bg-transparent text-sm outline-none placeholder:text-zinc-400"/>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2" style={{background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:'5px',padding:'6px 10px'}}>
+                <Search style={{width:12,height:12,color:'var(--dim)',flexShrink:0}}/>
+                <input
+                  value={search} onChange={e=>setSearch(e.target.value)}
+                  placeholder="Search deals…"
+                  style={{width:160,background:'transparent',border:'none',outline:'none',fontSize:'12px',color:'var(--text)'}}
+                />
               </div>
-              <div className="relative">
-                <select value={stageFilter} onChange={e=>setStageFilter(e.target.value)}
-                  className="appearance-none rounded-xl border border-zinc-200 bg-white pl-3 pr-8 py-2 text-sm text-zinc-700 outline-none cursor-pointer focus:border-zinc-400">
+              <div style={{position:'relative'}}>
+                <select
+                  value={stageFilter} onChange={e=>setStageFilter(e.target.value)}
+                  style={{appearance:'none',background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:'5px',padding:'6px 28px 6px 10px',fontSize:'11px',color:'var(--muted)',outline:'none',cursor:'pointer'}}
+                >
                   <option value="All">All Stages</option>
                   {STAGES.map(s=><option key={s}>{s}</option>)}
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-400"/>
+                <ChevronDown style={{position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',width:12,height:12,color:'var(--dim)',pointerEvents:'none'}}/>
               </div>
             </div>
           </div>
 
-          {/* Loading / empty / table */}
+          {/* Table */}
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <span className="text-sm text-zinc-400">Loading pipeline…</span>
+            <div className="flex items-center justify-center" style={{padding:'60px 20px'}}>
+              <span style={{fontSize:'12px',color:'var(--dim)'}}>Loading pipeline…</span>
             </div>
-          ) : deals.length===0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="mb-4 text-5xl opacity-20">◫</div>
-              <div className="text-base font-medium text-zinc-500">No deals yet</div>
-              <div className="mt-1 text-sm text-zinc-400">Click Add Deal to upload an OM or enter manually</div>
-              <button onClick={()=>setShowAdd(true)} className="mt-5 inline-flex items-center gap-2 rounded-xl bg-zinc-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700">
-                <Plus className="h-4 w-4"/> Add First Deal
+          ) : deals.length === 0 ? (
+            <div className="flex flex-col items-center justify-center text-center" style={{padding:'60px 20px'}}>
+              <div style={{fontSize:'32px',marginBottom:'8px',opacity:.3}}>◫</div>
+              <div style={{fontSize:'12px',fontWeight:500,color:'var(--muted)'}}>No deals yet</div>
+              <div style={{fontSize:'11px',color:'var(--dim)',marginTop:4}}>Click Add Deal to upload an OM or enter manually</div>
+              <button
+                onClick={()=>setShowAdd(true)}
+                className="inline-flex items-center gap-[5px] mt-5"
+                style={{padding:'7px 13px',borderRadius:'5px',fontSize:'12px',fontWeight:500,background:'var(--accent)',color:'#fff',border:'none',cursor:'pointer'}}
+              >
+                <Plus style={{width:13,height:13}}/> Add First Deal
               </button>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-zinc-50 text-xs font-medium uppercase tracking-widest text-zinc-400">
+            <div style={{overflowX:'auto'}}>
+              <table style={{width:'100%',borderCollapse:'collapse',minWidth:1100}}>
+                <thead>
                   <tr>
                     {PIPELINE_COLUMNS.map(col=>(
-                      <th key={col.key} className={cn('px-4 py-3 whitespace-nowrap', col.width)}>
-                        <button onClick={()=>handleSort(col.key)} className="inline-flex items-center gap-1 hover:text-zinc-600 transition">
+                      <th key={col.key}
+                        className={col.width}
+                        style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--dim)',padding:'8px 10px',textAlign:'left',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap',cursor:'pointer',userSelect:'none'}}
+                        onClick={()=>handleSort(col.key)}
+                      >
+                        <span className="inline-flex items-center gap-1" style={sortKey===col.key?{color:'var(--text)'}:{}}>
                           {col.label}
-                          <ArrowUpDown className={cn('h-3 w-3', sortKey===col.key?'text-zinc-700':'text-zinc-300')}/>
-                          {sortKey===col.key && <span className="text-[10px] text-zinc-500">{sortDir==='asc'?'↑':'↓'}</span>}
-                        </button>
+                          <ArrowUpDown style={{width:9,height:9,opacity: sortKey===col.key ? 1 : .35}}/>
+                          {sortKey===col.key && <span style={{fontSize:'9px',opacity:.7}}>{sortDir==='asc'?'↑':'↓'}</span>}
+                        </span>
                       </th>
                     ))}
-                    <th className="px-4 py-3 whitespace-nowrap text-xs font-medium uppercase tracking-widest text-zinc-400">Actions</th>
+                    <th style={{fontSize:'10px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'var(--dim)',padding:'8px 10px',textAlign:'left',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}>Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-100">
+                <tbody>
                   {filtered.map(deal=>(
-                    <tr key={deal.id} className="hover:bg-zinc-50 transition group">
-                      <td className="px-4 py-3 font-medium text-zinc-900 whitespace-nowrap max-w-[180px] truncate">{deal.propertyName||deal.propertyAddress||'—'}</td>
-                      <td className="px-4 py-3 text-zinc-600 max-w-[200px] truncate whitespace-nowrap">{deal.propertyAddress||'—'}</td>
-                      <td className="px-4 py-3 text-zinc-600 whitespace-nowrap">{deal.market||'—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {deal.assetType
-                          ? <span className="inline-flex items-center rounded-lg border border-zinc-200 bg-zinc-50 px-2.5 py-0.5 text-xs text-zinc-600">{deal.assetType}</span>
-                          : '—'}
+                    <tr key={deal.id} onClick={()=>setEditDeal(deal)}
+                      style={{cursor:'pointer'}}
+                      onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
+                      onMouseLeave={e=>e.currentTarget.style.background=''}
+                    >
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap',maxWidth:200,overflow:'hidden',textOverflow:'ellipsis'}}>
+                        <div style={{fontWeight:600,fontSize:'12px',color:'var(--text)'}}>{deal.propertyName||'—'}</div>
+                        {deal.propertyAddress && <div style={{fontSize:'10px',color:'var(--muted)',marginTop:1,overflow:'hidden',textOverflow:'ellipsis'}}>{deal.propertyAddress}</div>}
                       </td>
-                      <td className="px-4 py-3 font-mono text-sm text-zinc-600 whitespace-nowrap">{deal.sf||'—'}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-zinc-600 whitespace-nowrap">{deal.acreage||'—'}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-zinc-600 whitespace-nowrap">{deal.yearBuiltRenovated||'—'}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-zinc-600 whitespace-nowrap">{deal.parkingCount||'—'}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-zinc-600 whitespace-nowrap">{deal.occupancy||'—'}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-zinc-600 whitespace-nowrap">{deal.walt||'—'}</td>
-                      <td className="px-4 py-3 font-mono text-sm font-medium text-zinc-800 whitespace-nowrap">{deal.askingPrice||'—'}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-zinc-600 whitespace-nowrap">{deal.noi||'—'}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-zinc-600 whitespace-nowrap">{deal.capRate||'—'}</td>
-                      <td className="px-4 py-3 text-zinc-600 max-w-[150px] truncate whitespace-nowrap">{deal.broker||'—'}</td>
-                      <td className="px-4 py-3 text-zinc-600 max-w-[170px] truncate whitespace-nowrap">{deal.keyAnchors||'—'}</td>
-                      <td className="px-4 py-3 font-mono text-sm text-zinc-600 whitespace-nowrap">{deal.bidDate||'—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap"><StageBadge stage={deal.stage}/></td>
-                      <td className="px-4 py-3 text-zinc-400 max-w-[170px] truncate italic text-xs">{deal.notes||'—'}</td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition">
-                          <button onClick={()=>setEditDeal(deal)} className="inline-flex items-center gap-1 rounded-lg border border-zinc-200 bg-white px-2.5 py-1.5 text-xs font-medium text-zinc-700 hover:bg-zinc-50">
-                            <Pencil className="h-3 w-3"/> Edit
-                          </button>
-                          <button onClick={()=>setDeleteId(deal.id)} className="inline-flex items-center gap-1 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50">
-                            <Trash2 className="h-3 w-3"/>
-                          </button>
-                        </div>
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap'}}>{deal.market||<span style={{color:'var(--dim)'}}>—</span>}</td>
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}>
+                        {deal.assetType
+                          ? <span style={{fontSize:'9px',fontWeight:700,padding:'2px 6px',borderRadius:3,letterSpacing:'.04em',background:'var(--surface2)',color:'var(--muted)',border:'1px solid var(--border2)'}}>{deal.assetType}</span>
+                          : <span style={{color:'var(--dim)'}}>—</span>}
+                      </td>
+                      {['sf','acreage','yearBuiltRenovated','parkingCount','occupancy','walt'].map(k=>(
+                        <td key={k} style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>
+                          {deal[k]||<span style={{color:'var(--dim)'}}>—</span>}
+                        </td>
+                      ))}
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',fontWeight:500,color:'var(--text)',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{deal.askingPrice||<span style={{color:'var(--dim)'}}>—</span>}</td>
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{deal.noi||<span style={{color:'var(--dim)'}}>—</span>}</td>
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{deal.capRate||<span style={{color:'var(--dim)'}}>—</span>}</td>
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis'}}>{deal.broker||<span style={{color:'var(--dim)'}}>—</span>}</td>
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',maxWidth:170,overflow:'hidden',textOverflow:'ellipsis'}}>{deal.keyAnchors||<span style={{color:'var(--dim)'}}>—</span>}</td>
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{deal.bidDate||<span style={{color:'var(--dim)'}}>—</span>}</td>
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}><StageBadge stage={deal.stage}/></td>
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'10px',color:'var(--dim)',fontStyle:'italic',maxWidth:170,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{deal.notes||'—'}</td>
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}>
+                        <button
+                          onClick={e=>{e.stopPropagation();setDeleteId(deal.id);}}
+                          className="inline-flex items-center"
+                          style={{padding:'3px 8px',borderRadius:4,fontSize:'10px',fontWeight:600,cursor:'pointer',border:'1px solid #fecaca',background:'transparent',color:'#dc2626',transition:'all .15s'}}
+                          onMouseEnter={e=>e.currentTarget.style.background='#fef2f2'}
+                          onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+                        >
+                          <Trash2 style={{width:10,height:10}}/>
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -535,6 +899,8 @@ export default function App() {
             </div>
           )}
         </div>
+
+        </>}
       </main>
 
       {showAdd && (
@@ -558,13 +924,23 @@ export default function App() {
       )}
 
       {deleteId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-zinc-950/50 p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-2xl">
-            <div className="text-base font-semibold text-zinc-900 mb-2">Delete this deal?</div>
-            <div className="text-sm text-zinc-500 mb-5">This cannot be undone.</div>
-            <div className="flex gap-3">
-              <button onClick={()=>setDeleteId(null)} className="flex-1 rounded-xl border border-zinc-200 px-4 py-2.5 text-sm font-medium text-zinc-700 hover:bg-zinc-50">Cancel</button>
-              <button onClick={()=>deleteDeal(deleteId)} className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-700">Delete</button>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{background:'rgba(0,0,0,.45)'}}>
+          <div style={{width:'100%',maxWidth:360,background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',padding:'20px',boxShadow:'var(--sh-lg)'}}>
+            <div style={{fontSize:'15px',fontWeight:600,color:'var(--text)',marginBottom:6}}>Delete this deal?</div>
+            <div style={{fontSize:'12px',color:'var(--muted)',marginBottom:18}}>This cannot be undone.</div>
+            <div className="flex gap-2">
+              <button
+                onClick={()=>setDeleteId(null)}
+                style={{flex:1,padding:'7px 13px',borderRadius:'5px',fontSize:'12px',fontWeight:500,background:'var(--surface)',color:'var(--text)',border:'1px solid var(--border)',cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.background='var(--surface2)'}
+                onMouseLeave={e=>e.currentTarget.style.background='var(--surface)'}
+              >Cancel</button>
+              <button
+                onClick={()=>deleteDeal(deleteId)}
+                style={{flex:1,padding:'7px 13px',borderRadius:'5px',fontSize:'12px',fontWeight:500,background:'#dc2626',color:'#fff',border:'none',cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.background='#b91c1c'}
+                onMouseLeave={e=>e.currentTarget.style.background='#dc2626'}
+              >Delete</button>
             </div>
           </div>
         </div>
