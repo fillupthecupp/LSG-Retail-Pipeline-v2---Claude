@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LSG Deal Room</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=DM+Mono:wght@300;400;500&family=Instrument+Sans:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0d0d0d;
+  --surface: #141414;
+  --surface2: #1c1c1c;
+  --surface3: #222;
+  --border: #2a2a2a;
+  --gold: #c9a84c;
+  --text: #e8e4dc;
+  --muted: #7a7570;
+  --dim: #4a4745;
+  --green: #4caf7d;
+  --red: #e05c5c;
+  --amber: #e8a53a;
+  --pass: #4caf7d;
+  --fail: #e05c5c;
+  --watch: #e8a53a;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:'Instrument Sans',sans-serif; font-size:13px; min-height:100vh; }
+
+.app { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+.header { display:flex; align-items:center; justify-content:space-between; padding:14px 24px; border-bottom:1px solid var(--border); background:var(--surface); flex-shrink:0; }
+.logo-main { font-family:'Libre Baskerville',serif; font-size:15px; color:var(--text); }
+.logo-sub { font-family:'DM Mono',monospace; font-size:9px; color:var(--gold); letter-spacing:.15em; text-transform:uppercase; margin-top:2px; }
+.api-bar { display:flex; align-items:center; gap:10px; }
+.api-bar label { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; white-space:nowrap; }
+.api-bar input { background:var(--surface2); border:1px solid var(--border); border-radius:3px; padding:6px 10px; color:var(--text); font-family:'DM Mono',monospace; font-size:11px; width:240px; outline:none; }
+.api-bar input:focus { border-color:var(--gold); }
+.api-status { width:6px; height:6px; border-radius:50%; background:var(--dim); flex-shrink:0; }
+.api-status.ok { background:var(--green); }
+
+.body { display:flex; flex:1; overflow:hidden; }
+
+/* LEFT PANEL */
+.panel-left { width:360px; flex-shrink:0; border-right:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.panel-header { padding:14px 18px 10px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.panel-title { font-family:'DM Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); }
+.deal-count-badge { font-family:'DM Mono',monospace; font-size:10px; color:var(--gold); }
+
+.upload-strip { margin:12px 14px; border:1px dashed var(--border); border-radius:4px; padding:12px; text-align:center; cursor:pointer; transition:all .2s; position:relative; }
+.upload-strip:hover { border-color:var(--gold); background:rgba(201,168,76,.04); }
+.upload-strip input { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+.upload-strip-label { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.1em; }
+.upload-strip-label span { color:var(--gold); }
+
+.pipeline-list { flex:1; overflow-y:auto; padding:8px 0; }
+.pipeline-list::-webkit-scrollbar { width:3px; }
+.pipeline-list::-webkit-scrollbar-thumb { background:var(--border); }
+
+.deal-row { padding:12px 18px; cursor:pointer; border-left:3px solid transparent; transition:all .15s; border-bottom:1px solid rgba(42,42,42,.5); }
+.deal-row:hover { background:var(--surface2); }
+.deal-row.active { background:var(--surface2); border-left-color:var(--gold); }
+.deal-row-name { font-weight:600; font-size:13px; color:var(--text); margin-bottom:4px; }
+.deal-row-meta { display:flex; align-items:center; gap:8px; }
+.deal-row-loc { font-size:11px; color:var(--muted); }
+.deal-row-price { font-family:'DM Mono',monospace; font-size:11px; color:var(--gold); margin-left:auto; }
+.verdict-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.verdict-dot.pass { background:var(--pass); }
+.verdict-dot.fail { background:var(--fail); }
+.verdict-dot.watch { background:var(--watch); }
+.verdict-dot.none { background:var(--dim); }
+
+.stage-tag { font-family:'DM Mono',monospace; font-size:9px; text-transform:uppercase; letter-spacing:.08em; padding:2px 6px; border-radius:2px; }
+.stage-tag.screening { background:rgba(91,155,213,.12); color:#5b9bd5; }
+.stage-tag.underwriting { background:rgba(201,168,76,.12); color:var(--gold); }
+.stage-tag.bid { background:rgba(232,165,58,.12); color:var(--amber); }
+.stage-tag.dead { background:rgba(74,71,69,.2); color:var(--dim); }
+.stage-tag.pass { background:rgba(76,175,125,.12); color:var(--pass); }
+
+/* RIGHT PANEL */
+.panel-right { flex:1; overflow-y:auto; display:flex; flex-direction:column; }
+.panel-right::-webkit-scrollbar { width:3px; }
+.panel-right::-webkit-scrollbar-thumb { background:var(--border); }
+
+.empty-state { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--dim); gap:12px; padding:40px; text-align:center; }
+.empty-icon { font-size:36px; opacity:.3; }
+.empty-text { font-family:'DM Mono',monospace; font-size:11px; text-transform:uppercase; letter-spacing:.1em; }
+.empty-steps { list-style:none; display:flex; flex-direction:column; gap:8px; margin-top:8px; }
+.empty-steps li { font-family:'DM Mono',monospace; font-size:10px; color:var(--dim); }
+
+/* DETAIL */
+.detail { padding:24px 28px; }
+.detail-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:20px; padding-bottom:20px; border-bottom:1px solid var(--border); }
+.detail-title { font-family:'Libre Baskerville',serif; font-size:22px; color:var(--text); margin-bottom:6px; }
+.detail-sub { font-size:12px; color:var(--muted); display:flex; gap:12px; flex-wrap:wrap; }
+.detail-actions { display:flex; gap:8px; align-items:flex-start; flex-shrink:0; }
+
+.btn { padding:7px 14px; border-radius:3px; font-family:'DM Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.1em; cursor:pointer; border:none; transition:all .2s; }
+.btn-gold { background:var(--gold); color:#0d0d0d; font-weight:500; }
+.btn-gold:hover { background:#d4b058; }
+.btn-ghost { background:transparent; border:1px solid var(--border); color:var(--muted); }
+.btn-ghost:hover { border-color:var(--gold); color:var(--gold); }
+.btn-danger { background:transparent; border:1px solid rgba(224,92,92,.3); color:var(--red); }
+.btn-danger:hover { background:rgba(224,92,92,.08); }
+.btn:disabled { opacity:.3; cursor:not-allowed; }
+
+.metrics-row { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; margin-bottom:20px; }
+.metric-card { background:var(--surface); border:1px solid var(--border); border-radius:4px; padding:12px 14px; position:relative; }
+.metric-card::after { content:''; position:absolute; top:0; left:0; right:0; height:2px; border-radius:4px 4px 0 0; }
+.metric-card.pass::after { background:var(--pass); }
+.metric-card.fail::after { background:var(--fail); }
+.metric-card.watch::after { background:var(--watch); }
+.metric-card.neutral::after { background:var(--border); }
+.metric-label { font-family:'DM Mono',monospace; font-size:9px; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); margin-bottom:6px; }
+.metric-val { font-family:'DM Mono',monospace; font-size:18px; font-weight:500; line-height:1; }
+.metric-card.pass .metric-val { color:var(--pass); }
+.metric-card.fail .metric-val { color:var(--fail); }
+.metric-card.watch .metric-val { color:var(--watch); }
+.metric-card.neutral .metric-val { color:var(--text); }
+.metric-hurdle { font-family:'DM Mono',monospace; font-size:9px; color:var(--dim); margin-top:4px; }
+
+.section { background:var(--surface); border:1px solid var(--border); border-radius:4px; margin-bottom:14px; overflow:hidden; }
+.section-head { padding:10px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:8px; }
+.section-head-title { font-family:'DM Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
+.section-body { padding:16px; }
+
+.info-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.info-item label { font-family:'DM Mono',monospace; font-size:9px; text-transform:uppercase; letter-spacing:.1em; color:var(--dim); display:block; margin-bottom:4px; }
+.info-item .val { font-size:13px; color:var(--text); }
+
+.tenant-list { display:flex; flex-direction:column; gap:6px; }
+.tenant-row { display:flex; align-items:center; gap:12px; padding:8px 10px; background:var(--surface2); border-radius:3px; font-size:12px; }
+.tenant-name { font-weight:500; flex:1; }
+.tenant-sf { font-family:'DM Mono',monospace; font-size:11px; color:var(--muted); }
+.tenant-exp { font-family:'DM Mono',monospace; font-size:11px; color:var(--muted); }
+.tenant-risk { font-family:'DM Mono',monospace; font-size:9px; padding:2px 6px; border-radius:2px; }
+.tenant-risk.high { background:rgba(224,92,92,.15); color:var(--red); }
+.tenant-risk.medium { background:rgba(232,165,58,.15); color:var(--amber); }
+.tenant-risk.low { background:rgba(74,71,69,.2); color:var(--muted); }
+
+.risk-list { display:flex; flex-direction:column; gap:8px; }
+.risk-item { display:flex; gap:10px; padding:10px 12px; background:var(--surface2); border-radius:3px; border-left:2px solid; font-size:12px; line-height:1.5; color:#c0bdb5; }
+.risk-item.high { border-color:var(--fail); }
+.risk-item.medium { border-color:var(--watch); }
+.risk-item.low { border-color:var(--dim); }
+.risk-sev { font-family:'DM Mono',monospace; font-size:9px; text-transform:uppercase; padding:2px 6px; border-radius:2px; height:fit-content; flex-shrink:0; margin-top:1px; }
+.risk-item.high .risk-sev { background:rgba(224,92,92,.15); color:var(--red); }
+.risk-item.medium .risk-sev { background:rgba(232,165,58,.15); color:var(--amber); }
+.risk-item.low .risk-sev { background:rgba(74,71,69,.2); color:var(--muted); }
+
+/* SCREENER */
+.screener-panel { background:var(--surface); border:1px solid var(--border); border-radius:4px; margin-bottom:14px; overflow:hidden; }
+.screener-head { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; align-items:center; justify-content:space-between; }
+.screener-title { font-family:'DM Mono',monospace; font-size:10px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
+.screener-verdict { display:flex; align-items:center; gap:10px; }
+.verdict-pill { font-family:'DM Mono',monospace; font-size:11px; font-weight:500; padding:4px 12px; border-radius:2px; letter-spacing:.08em; }
+.verdict-pill.PASS { background:rgba(76,175,125,.15); color:var(--pass); border:1px solid rgba(76,175,125,.3); }
+.verdict-pill.FAIL { background:rgba(224,92,92,.15); color:var(--fail); border:1px solid rgba(224,92,92,.3); }
+.verdict-pill.WATCH { background:rgba(232,165,58,.15); color:var(--watch); border:1px solid rgba(232,165,58,.3); }
+.verdict-pill.NONE { background:rgba(74,71,69,.2); color:var(--dim); border:1px solid var(--border); }
+
+.screener-body { padding:16px; }
+.override-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+.override-field label { font-family:'DM Mono',monospace; font-size:9px; text-transform:uppercase; letter-spacing:.1em; color:var(--dim); display:block; margin-bottom:5px; }
+.override-field input { width:100%; background:var(--surface2); border:1px solid var(--border); border-radius:3px; padding:7px 10px; color:var(--text); font-family:'DM Mono',monospace; font-size:12px; outline:none; transition:border-color .2s; }
+.override-field input:focus { border-color:var(--gold); }
+.override-field .field-note { font-size:10px; color:var(--dim); margin-top:3px; font-family:'DM Mono',monospace; }
+
+.screener-run-row { display:flex; align-items:center; gap:12px; margin-bottom:16px; }
+.screener-progress { flex:1; display:none; }
+.screener-track { height:2px; background:var(--border); border-radius:2px; overflow:hidden; }
+.screener-fill { height:100%; background:var(--gold); width:0%; transition:width .4s ease; }
+.screener-status { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); margin-top:6px; }
+
+.screener-result { display:none; }
+.verdict-banner { border-radius:4px; padding:16px 20px; margin-bottom:14px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.verdict-banner.PASS { background:rgba(76,175,125,.07); border:1px solid rgba(76,175,125,.25); }
+.verdict-banner.FAIL { background:rgba(224,92,92,.07); border:1px solid rgba(224,92,92,.25); }
+.verdict-banner.WATCH { background:rgba(232,165,58,.07); border:1px solid rgba(232,165,58,.25); }
+.verdict-big { font-family:'Libre Baskerville',serif; font-size:28px; letter-spacing:.05em; flex-shrink:0; }
+.verdict-banner.PASS .verdict-big { color:var(--pass); }
+.verdict-banner.FAIL .verdict-big { color:var(--fail); }
+.verdict-banner.WATCH .verdict-big { color:var(--watch); }
+.verdict-rationale { font-size:12px; color:#c0bdb5; line-height:1.6; text-align:right; }
+
+.screen-metrics { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:14px; }
+.next-steps-list { list-style:none; counter-reset:ns; display:flex; flex-direction:column; gap:7px; }
+.ns-item { counter-increment:ns; display:flex; gap:10px; align-items:flex-start; padding:9px 12px; background:var(--surface2); border-radius:3px; font-size:12px; color:#c0bdb5; line-height:1.5; }
+.ns-item::before { content:counter(ns,decimal-leading-zero); font-family:'DM Mono',monospace; font-size:10px; color:var(--gold); flex-shrink:0; margin-top:2px; }
+.copy-row { display:flex; gap:8px; margin-top:14px; }
+
+.processing-bar { display:none; align-items:center; gap:12px; padding:10px 24px; background:rgba(201,168,76,.05); border-bottom:1px solid rgba(201,168,76,.12); flex-shrink:0; }
+.processing-bar.visible { display:flex; }
+.processing-text { font-family:'DM Mono',monospace; font-size:11px; color:var(--gold); white-space:nowrap; }
+.processing-dots::after { content:'...'; animation:dots 1.2s steps(4,end) infinite; }
+@keyframes dots { 0%,20%{content:'.'} 40%{content:'..'} 60%,100%{content:'...'} }
+.processing-track { flex:1; height:2px; background:var(--border); border-radius:2px; overflow:hidden; }
+.processing-fill { height:100%; background:var(--gold); transition:width .5s; }
+.processing-status-text { font-family:'DM Mono',monospace; font-size:10px; color:var(--muted); white-space:nowrap; }
+
+p.body-text { font-size:12px; color:#c0bdb5; line-height:1.7; }
+
+select.stage-select {
+  background:var(--surface2);
+  border:1px solid var(--border);
+  border-radius:3px;
+  padding:6px 10px;
+  color:var(--text);
+  font-family:'DM Mono',monospace;
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.08em;
+  outline:none;
+  cursor:pointer;
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<div class="header">
+  <div>
+    <div class="logo-main">LSG Deal Room</div>
+    <div class="logo-sub">Lightstone Acquisitions · Retail Pipeline</div>
+  </div>
+  <div class="api-bar">
+    <label>Anthropic API Key</label>
+    <input type="password" id="apiKey" placeholder="sk-ant-api03-..." oninput="checkApiKey()" autocomplete="off" />
+    <div class="api-status" id="apiStatus" title="Green = key entered"></div>
+  </div>
+</div>
+
+<div class="processing-bar" id="processingBar">
+  <div class="processing-text">Ingesting OM<span class="processing-dots"></span></div>
+  <div class="processing-track"><div class="processing-fill" id="ingestFill" style="width:0%"></div></div>
+  <div class="processing-status-text" id="ingestStatus">Reading PDF...</div>
+</div>
+
+<div class="body">
+
+  <div class="panel-left">
+    <div class="panel-header">
+      <div class="panel-title">Deal Pipeline</div>
+      <div class="deal-count-badge" id="dealCountBadge">0 deals</div>
+    </div>
+    <div class="upload-strip" id="uploadStrip">
+      <input type="file" id="omFile" accept=".pdf" onchange="handleUpload(event)" />
+      <div class="upload-strip-label">⬆ Drop OM PDF · <span>click to upload</span></div>
+    </div>
+    <div class="pipeline-list" id="pipelineList"></div>
+  </div>
+
+  <div class="panel-right" id="panelRight">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-icon">◫</div>
+      <div class="empty-text">LSG Deal Room</div>
+      <ul class="empty-steps">
+        <li>01 · Paste your Anthropic API key (top right)</li>
+        <li>02 · Upload an OM PDF using the left panel</li>
+        <li>03 · AI extracts deal data automatically</li>
+        <li>04 · Click any deal → run a screener test</li>
+        <li>05 · Override price/cap and re-run as needed</li>
+      </ul>
+    </div>
+    <div class="detail" id="detailView" style="display:none"></div>
+  </div>
+
+</div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────
+let deals = [];
+let activeDealId = null;
+
+try {
+  const saved = localStorage.getItem('lsg_dealroom_v3');
+  if (saved) deals = JSON.parse(saved);
+} catch(e) {}
+
+function save() {
+  try { localStorage.setItem('lsg_dealroom_v3', JSON.stringify(deals)); } catch(e) {}
+}
+
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2,7);
+}
+
+// ── API Key ────────────────────────────────────────────────────────────
+function getKey() { return document.getElementById('apiKey').value.trim(); }
+function checkApiKey() {
+  const ok = getKey().startsWith('sk-');
+  document.getElementById('apiStatus').className = 'api-status' + (ok ? ' ok' : '');
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function fmtM(n) {
+  if (n === null || n === undefined || n === '') return '—';
+  const num = parseFloat(n);
+  if (isNaN(num)) return '—';
+  if (num >= 1e9) return '$' + (num/1e9).toFixed(2) + 'B';
+  if (num >= 1e6) return '$' + (num/1e6).toFixed(1) + 'M';
+  if (num >= 1e3) return '$' + (num/1e3).toFixed(0) + 'K';
+  return '$' + num.toLocaleString();
+}
+
+function fmtNum(n, suffix='') {
+  if (n === null || n === undefined) return '—';
+  const num = parseFloat(n);
+  if (isNaN(num)) return '—';
+  return num.toLocaleString() + suffix;
+}
+
+// ── Upload & Ingest ────────────────────────────────────────────────────
+async function handleUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  e.target.value = '';
+
+  if (!getKey()) {
+    alert('Please enter your Anthropic API key in the top-right field first.');
+    return;
+  }
+
+  const bar = document.getElementById('processingBar');
+  const fill = document.getElementById('ingestFill');
+  const status = document.getElementById('ingestStatus');
+  bar.classList.add('visible');
+  fill.style.width = '10%';
+  status.textContent = 'Reading PDF...';
+
+  let b64;
+  try {
+    b64 = await new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(r.result.split(',')[1]);
+      r.onerror = () => rej(new Error('File read failed'));
+      r.readAsDataURL(file);
+    });
+  } catch(err) {
+    bar.classList.remove('visible');
+    alert('Could not read file: ' + err.message);
+    return;
+  }
+
+  fill.style.width = '30%';
+  status.textContent = 'Sending to AI...';
+
+  const systemPrompt = `You are a CRE acquisitions analyst at Lightstone Group. Extract all available deal data from this Offering Memorandum and return ONLY valid JSON. No preamble, no markdown code fences, no explanation.
+
+Return this exact structure:
+{
+  "name": "Property name",
+  "type": "Asset subtype (Power Center, Strip Center, Regional Mall, Super-Regional Mall, Lifestyle Center, Grocery-Anchored, etc.)",
+  "address": "Street address or null",
+  "city": "City",
+  "state": "ST (2-letter)",
+  "market": "Market / Submarket or null",
+  "gla_sf": number or null,
+  "year_built": number or null,
+  "occupancy_pct": number or null,
+  "asking_price": number or null,
+  "asking_cap_pct": number or null,
+  "noi": number or null,
+  "walt_yrs": number or null,
+  "price_psf": number or null,
+  "anchor_count": number or null,
+  "broker": "Brokerage name or null",
+  "tenants": [
+    { "name": "Tenant name", "sf": number or null, "lease_exp": "YYYY or MMM-YY or null", "risk": "high or medium or low" }
+  ],
+  "debt_notes": "Any mentioned financing/debt structure or null",
+  "key_highlights": ["highlight 1", "highlight 2", "highlight 3"],
+  "risk_notes": "Preliminary observations on risk from the OM or null",
+  "stage": "Screening"
+}`;
+
+  let result;
+  try {
+    fill.style.width = '55%';
+    status.textContent = 'Extracting deal data...';
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': getKey(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2000,
+        system: systemPrompt,
+        messages: [{
+          role: 'user',
+          content: [
+            {
+              type: 'document',
+              source: { type: 'base64', media_type: 'application/pdf', data: b64 }
+            },
+            {
+              type: 'text',
+              text: `Extract all deal data from this Offering Memorandum. Filename: ${file.name}`
+            }
+          ]
+        }]
+      })
+    });
+
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      throw new Error(errData.error?.message || `API error ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const raw = data.content.find(b => b.type === 'text')?.text || '';
+    const clean = raw.replace(/```json|```/g, '').trim();
+    result = JSON.parse(clean);
+
+  } catch(err) {
+    bar.classList.remove('visible');
+    fill.style.width = '0%';
+    alert('Ingestion failed: ' + err.message);
+    return;
+  }
+
+  fill.style.width = '90%';
+  status.textContent = 'Saving...';
+
+  const deal = {
+    id: uid(),
+    ...result,
+    screen: null,
+    added: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  };
+
+  deals.unshift(deal);
+  save();
+
+  fill.style.width = '100%';
+  setTimeout(() => {
+    bar.classList.remove('visible');
+    fill.style.width = '0%';
+    renderPipeline();
+    selectDeal(deal.id);
+  }, 500);
+}
+
+// ── Pipeline ───────────────────────────────────────────────────────────
+function renderPipeline() {
+  const list = document.getElementById('pipelineList');
+  const badge = document.getElementById('dealCountBadge');
+  badge.textContent = deals.length + (deals.length === 1 ? ' deal' : ' deals');
+
+  if (!deals.length) {
+    list.innerHTML = `<div style="padding:28px 18px;text-align:center;color:var(--dim);font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;line-height:1.8;">Upload an OM to begin</div>`;
+    return;
+  }
+
+  list.innerHTML = deals.map(d => {
+    const verdict = d.screen?.verdict || 'none';
+    const vclass = verdict.toLowerCase();
+    const price = d.asking_price ? fmtM(d.asking_price) : '—';
+    const stage = d.stage || 'Screening';
+    const stageClass = stage.toLowerCase().replace(/\s+/g,'');
+    return `<div class="deal-row ${activeDealId === d.id ? 'active' : ''}" onclick="selectDeal('${d.id}')">
+      <div class="deal-row-name">${esc(d.name || 'Unnamed Asset')}</div>
+      <div class="deal-row-meta">
+        <div class="verdict-dot ${vclass}"></div>
+        <div class="deal-row-loc">${esc((d.city||'') + (d.state ? ', '+d.state : ''))}</div>
+        <span class="stage-tag ${stageClass}">${esc(stage)}</span>
+        <div class="deal-row-price">${price}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Select Deal ────────────────────────────────────────────────────────
+function selectDeal(id) {
+  activeDealId = id;
+  renderPipeline();
+  const d = deals.find(x => x.id === id);
+  if (!d) return;
+  document.getElementById('emptyState').style.display = 'none';
+  document.getElementById('detailView').style.display = 'block';
+  renderDetail(d);
+  document.getElementById('panelRight').scrollTop = 0;
+}
+
+function getDeal(id) { return deals.find(x => x.id === (id || activeDealId)); }
+
+// ── Render Detail ──────────────────────────────────────────────────────
+function renderDetail(d) {
+  const cap = parseFloat(d.asking_cap_pct);
+  const capStatus = !isNaN(cap) ? (cap >= 8.5 ? 'pass' : cap >= 7.5 ? 'watch' : 'fail') : 'neutral';
+
+  const tenantsHtml = (d.tenants || []).length
+    ? (d.tenants).slice(0, 10).map(t => `
+      <div class="tenant-row">
+        <div class="tenant-name">${esc(t.name)}</div>
+        <div class="tenant-sf">${t.sf ? t.sf.toLocaleString() + ' SF' : '—'}</div>
+        <div class="tenant-exp">${esc(t.lease_exp || '—')}</div>
+        <span class="tenant-risk ${t.risk || 'low'}">${esc(t.risk || 'low')}</span>
+      </div>`).join('')
+    : `<div style="color:var(--dim);font-size:12px;padding:6px 0;">No tenant data extracted from OM</div>`;
+
+  const highlightsHtml = (d.key_highlights || [])
+    .map(h => `<li class="ns-item">${esc(h)}</li>`).join('');
+
+  const stageOptions = ['Screening','Underwriting','Bid','Pass','Dead']
+    .map(s => `<option value="${s}" ${d.stage === s ? 'selected' : ''}>${s}</option>`).join('');
+
+  const screenSection = renderScreenerPanel(d);
+
+  document.getElementById('detailView').innerHTML = `
+    <div class="detail-header">
+      <div style="flex:1;min-width:0;">
+        <div class="detail-title">${esc(d.name || 'Unnamed Asset')}</div>
+        <div class="detail-sub">
+          <span>📍 ${esc([d.address, d.city, d.state].filter(Boolean).join(', ') || 'Location N/A')}</span>
+          <span>🏢 ${esc(d.type || '—')}</span>
+          <span>📅 Added ${esc(d.added || '—')}</span>
+        </div>
+      </div>
+      <div class="detail-actions">
+        <select class="stage-select" onchange="updateStage('${d.id}', this.value)">${stageOptions}</select>
+        <button class="btn btn-danger" onclick="deleteDeal('${d.id}')">Delete</button>
+      </div>
+    </div>
+
+    <div class="metrics-row">
+      <div class="metric-card neutral">
+        <div class="metric-label">Asking Price</div>
+        <div class="metric-val">${fmtM(d.asking_price)}</div>
+        <div class="metric-hurdle">Guidance</div>
+      </div>
+      <div class="metric-card ${capStatus}">
+        <div class="metric-label">Cap Rate</div>
+        <div class="metric-val">${!isNaN(cap) ? cap.toFixed(2) + '%' : '—'}</div>
+        <div class="metric-hurdle">Hurdle ≥ 8.5%</div>
+      </div>
+      <div class="metric-card neutral">
+        <div class="metric-label">NOI</div>
+        <div class="metric-val">${fmtM(d.noi)}</div>
+        <div class="metric-hurdle">In-place</div>
+      </div>
+      <div class="metric-card neutral">
+        <div class="metric-label">GLA</div>
+        <div class="metric-val">${d.gla_sf ? Math.round(d.gla_sf/1000) + 'K SF' : '—'}</div>
+        <div class="metric-hurdle">${d.price_psf ? '$'+parseFloat(d.price_psf).toFixed(0)+'/SF' : 'PSF N/A'}</div>
+      </div>
+      <div class="metric-card neutral">
+        <div class="metric-label">WALT</div>
+        <div class="metric-val">${d.walt_yrs ? parseFloat(d.walt_yrs).toFixed(1) + ' yr' : '—'}</div>
+        <div class="metric-hurdle">${d.occupancy_pct ? parseFloat(d.occupancy_pct).toFixed(0) + '% occ.' : 'Occ. N/A'}</div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><div class="section-head-title">Property Info</div></div>
+      <div class="section-body">
+        <div class="info-grid">
+          <div class="info-item"><label>Market / Submarket</label><div class="val">${esc(d.market || '—')}</div></div>
+          <div class="info-item"><label>Broker</label><div class="val">${esc(d.broker || '—')}</div></div>
+          <div class="info-item"><label>Year Built</label><div class="val">${esc(d.year_built || '—')}</div></div>
+          <div class="info-item"><label>Anchor Count</label><div class="val">${esc(d.anchor_count || '—')}</div></div>
+          <div class="info-item"><label>Occupancy</label><div class="val">${d.occupancy_pct ? parseFloat(d.occupancy_pct).toFixed(1)+'%' : '—'}</div></div>
+          <div class="info-item"><label>Debt / Structure</label><div class="val">${esc(d.debt_notes || '—')}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-head"><div class="section-head-title">Key Tenants</div></div>
+      <div class="section-body"><div class="tenant-list">${tenantsHtml}</div></div>
+    </div>
+
+    ${highlightsHtml ? `
+    <div class="section">
+      <div class="section-head"><div class="section-head-title">OM Highlights</div></div>
+      <div class="section-body"><ul class="next-steps-list">${highlightsHtml}</ul></div>
+    </div>` : ''}
+
+    ${d.risk_notes ? `
+    <div class="section">
+      <div class="section-head"><div class="section-head-title">Preliminary Risk Notes</div></div>
+      <div class="section-body"><p class="body-text">${esc(d.risk_notes)}</p></div>
+    </div>` : ''}
+
+    ${screenSection}
+  `;
+
+  // Show screener result if it exists
+  if (d.screen) {
+    const resultEl = document.getElementById('screenerResult');
+    if (resultEl) {
+      resultEl.innerHTML = renderScreenResult(d.screen);
+      resultEl.style.display = 'block';
+    }
+  }
+}
+
+function renderScreenerPanel(d) {
+  const capPlaceholder = d.asking_cap_pct ? parseFloat(d.asking_cap_pct).toFixed(2) : 'e.g. 8.50';
+  const pricePlaceholder = d.asking_price ? (d.asking_price/1e6).toFixed(1) : 'e.g. 65.0';
+  const hadScreen = !!d.screen;
+
+  return `
+  <div class="screener-panel">
+    <div class="screener-head">
+      <div class="screener-title">⚡ Screener — Lightstone Hurdles (Cap ≥ 8.5% · IRR ≥ 15% · CoC ≥ 10%)</div>
+      <div class="screener-verdict">
+        <span style="font-family:'DM Mono',monospace;font-size:10px;color:var(--dim);">${hadScreen ? 'Last run: '+d.screen.ran_at : 'Not screened'}</span>
+        <div class="verdict-pill ${hadScreen ? d.screen.verdict : 'NONE'}" id="verdictPill">${hadScreen ? d.screen.verdict : '—'}</div>
+      </div>
+    </div>
+    <div class="screener-body">
+      <div style="font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px;">Override Assumptions (optional)</div>
+      <div class="override-grid">
+        <div class="override-field">
+          <label>Test Price ($M)</label>
+          <input type="number" id="ov_price" placeholder="${pricePlaceholder}" step="0.5" min="0" />
+          <div class="field-note">Blank = use OM asking price</div>
+        </div>
+        <div class="override-field">
+          <label>Test Cap Rate (%)</label>
+          <input type="number" id="ov_cap" placeholder="${capPlaceholder}" step="0.25" min="0" />
+          <div class="field-note">Blank = use OM cap rate</div>
+        </div>
+        <div class="override-field">
+          <label>Additional Context</label>
+          <input type="text" id="ov_context" placeholder="e.g. CMBS maturity, 65% LTV, assume 7yr hold" />
+          <div class="field-note">Optional — fed to AI agent</div>
+        </div>
+      </div>
+      <div class="screener-run-row">
+        <button class="btn btn-gold" id="runScreenBtn" onclick="runScreen('${d.id}')">Run Screen</button>
+        ${hadScreen ? `<button class="btn btn-ghost" onclick="clearScreen('${d.id}')">Clear</button>` : ''}
+        <div class="screener-progress" id="screenProgress">
+          <div class="screener-track"><div class="screener-fill" id="screenFill"></div></div>
+          <div class="screener-status" id="screenStatus">Running screen...</div>
+        </div>
+      </div>
+      <div class="screener-result" id="screenerResult"></div>
+    </div>
+  </div>`;
+}
+
+function renderScreenResult(s) {
+  if (!s) return '';
+
+  const metricsHtml = (s.metrics || []).map(m => `
+    <div class="metric-card ${m.status || 'neutral'}">
+      <div class="metric-label">${esc(m.name)}</div>
+      <div class="metric-val">${esc(m.value || '—')}</div>
+      <div class="metric-hurdle">${esc(m.hurdle || '')}</div>
+    </div>`).join('');
+
+  const risksHtml = (s.risk_flags || []).map(f => `
+    <div class="risk-item ${f.severity || 'low'}">
+      <span class="risk-sev">${esc(f.severity || 'low')}</span>
+      ${esc(f.flag)}
+    </div>`).join('');
+
+  const stepsHtml = (s.next_steps || []).map(ns => `<li class="ns-item">${esc(ns)}</li>`).join('');
+
+  return `
+    <div class="verdict-banner ${s.verdict}">
+      <div class="verdict-big">${s.verdict}</div>
+      <div class="verdict-rationale">${esc(s.verdict_rationale || '')}</div>
+    </div>
+    <div class="screen-metrics">${metricsHtml}</div>
+    ${s.investment_thesis ? `
+    <div class="section" style="margin-bottom:10px">
+      <div class="section-head"><div class="section-head-title">Investment Thesis</div></div>
+      <div class="section-body"><p class="body-text">${esc(s.investment_thesis)}</p></div>
+    </div>` : ''}
+    ${risksHtml ? `
+    <div class="section" style="margin-bottom:10px">
+      <div class="section-head"><div class="section-head-title">Risk Flags</div></div>
+      <div class="section-body"><div class="risk-list">${risksHtml}</div></div>
+    </div>` : ''}
+    ${stepsHtml ? `
+    <div class="section" style="margin-bottom:10px">
+      <div class="section-head"><div class="section-head-title">Recommended Next Steps</div></div>
+      <div class="section-body"><ul class="next-steps-list">${stepsHtml}</ul></div>
+    </div>` : ''}
+    ${s.data_quality_note ? `
+    <div class="section" style="margin-bottom:10px">
+      <div class="section-head"><div class="section-head-title">Data Quality · ${(s.data_quality||'').toUpperCase()}</div></div>
+      <div class="section-body"><p class="body-text">${esc(s.data_quality_note)}</p></div>
+    </div>` : ''}
+    <div class="copy-row">
+      <button class="btn btn-ghost" onclick="copyBrief()">Copy Brief</button>
+    </div>`;
+}
+
+// ── Run Screen ─────────────────────────────────────────────────────────
+async function runScreen(id) {
+  const d = getDeal(id);
+  if (!d) return;
+  if (!getKey()) { alert('Enter your Anthropic API key first.'); return; }
+
+  const ovPriceRaw = document.getElementById('ov_price')?.value;
+  const ovCapRaw = document.getElementById('ov_cap')?.value;
+  const ovCtx = document.getElementById('ov_context')?.value?.trim() || '';
+
+  const ovPrice = ovPriceRaw ? parseFloat(ovPriceRaw) * 1e6 : null;
+  const ovCap = ovCapRaw ? parseFloat(ovCapRaw) : null;
+
+  const testPrice = ovPrice || d.asking_price;
+  const testCap = ovCap || d.asking_cap_pct;
+
+  const btn = document.getElementById('runScreenBtn');
+  const prog = document.getElementById('screenProgress');
+  const fill = document.getElementById('screenFill');
+  const status = document.getElementById('screenStatus');
+
+  btn.disabled = true;
+  prog.style.display = 'block';
+  fill.style.width = '15%';
+  status.textContent = 'Preparing screen...';
+
+  const systemPrompt = `You are a senior acquisitions analyst at Lightstone Group, a NYC-based real estate PE firm. Screen this deal against firm investment hurdles with institutional rigor. Respond ONLY with valid JSON — no preamble, no markdown fences.
+
+LIGHTSTONE HURDLE RATES:
+- Going-in cap rate: ≥ 8.5% (hard floor)
+- Levered IRR: ≥ 15.0% (base case)
+- Cash-on-cash: ≥ 10.0% Year 1
+- Debt yield: ≥ 8.0%
+- Max LTV: ~75% stabilized
+- Hold: 5–7 years preferred
+
+VERDICT LOGIC:
+- PASS = meets or exceeds most hurdles with manageable risk
+- WATCH = borderline on 1-2 hurdles or meaningful structural risk; warrants deeper diligence
+- FAIL = misses multiple hurdles or has a deal-breaking structural risk
+
+OUTPUT JSON:
+{
+  "verdict": "PASS" or "WATCH" or "FAIL",
+  "verdict_rationale": "2-3 sentence executive summary of verdict",
+  "investment_thesis": "3-5 sentence thesis paragraph",
+  "metrics": [
+    {"name": "Cap Rate", "value": "X.XX%", "hurdle": "≥ 8.5%", "status": "pass or watch or fail or na"},
+    {"name": "IRR (Base)", "value": "X.X% (est.)", "hurdle": "≥ 15.0%", "status": "pass or watch or fail or na"},
+    {"name": "Cash-on-Cash", "value": "X.X% (est.)", "hurdle": "≥ 10.0%", "status": "pass or watch or fail or na"},
+    {"name": "Debt Yield", "value": "X.X%", "hurdle": "≥ 8.0%", "status": "pass or watch or fail or na"}
+  ],
+  "risk_flags": [
+    {"severity": "high or medium or low", "flag": "One sentence risk description"}
+  ],
+  "next_steps": ["Step 1", "Step 2", "Step 3"],
+  "data_quality": "high or medium or low",
+  "data_quality_note": "Note on missing or uncertain data points"
+}`;
+
+  const noi = d.noi ? fmtM(d.noi) : 'N/A';
+  const testPricePSF = (testPrice && d.gla_sf) ? '$' + (testPrice/d.gla_sf).toFixed(0) + '/SF' : 'N/A';
+  const debtYield = (d.noi && testPrice) ? ((d.noi / (testPrice * 0.65)) * 100).toFixed(2) + '%' : 'N/A';
+
+  const prompt = `DEAL SUMMARY FOR SCREENING:
+
+Property: ${d.name || 'N/A'}
+Type: ${d.type || 'N/A'} | Location: ${d.city || 'N/A'}, ${d.state || 'N/A'}
+GLA: ${d.gla_sf ? d.gla_sf.toLocaleString() + ' SF' : 'N/A'} | Year Built: ${d.year_built || 'N/A'}
+Occupancy: ${d.occupancy_pct ? d.occupancy_pct + '%' : 'N/A'} | WALT: ${d.walt_yrs ? d.walt_yrs + ' yrs' : 'N/A'}
+Anchor Count: ${d.anchor_count || 'N/A'}
+
+PRICING (TEST BASIS):
+  Price: ${testPrice ? fmtM(testPrice) : 'N/A'}
+  Going-in Cap: ${testCap ? testCap + '%' : 'N/A'}
+  In-place NOI: ${noi}
+  Price/SF: ${testPricePSF}
+  Est. Debt Yield (65% LTV): ${debtYield}
+  ${ovPrice ? '⚠ PRICE OVERRIDE APPLIED: ' + fmtM(ovPrice) + ' (OM price: ' + fmtM(d.asking_price) + ')' : ''}
+  ${ovCap ? '⚠ CAP OVERRIDE APPLIED: ' + ovCap + '% (OM cap: ' + d.asking_cap_pct + '%)' : ''}
+
+TENANTS:
+${(d.tenants || []).slice(0, 8).map(t => `  - ${t.name}${t.sf ? ' (' + t.sf.toLocaleString() + ' SF)' : ''}${t.lease_exp ? ', exp ' + t.lease_exp : ''} [risk: ${t.risk || 'unknown'}]`).join('\n') || '  N/A'}
+
+DEBT / STRUCTURE: ${d.debt_notes || 'N/A'}
+BROKER: ${d.broker || 'N/A'}
+${d.risk_notes ? 'PRELIMINARY RISK NOTES: ' + d.risk_notes : ''}
+${ovCtx ? 'ADDITIONAL CONTEXT: ' + ovCtx : ''}
+
+Please screen this deal against Lightstone hurdle rates and provide your institutional assessment.`;
+
+  let result;
+  try {
+    fill.style.width = '50%';
+    status.textContent = 'Analyzing against hurdles...';
+
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': getKey(),
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+
+    if (!resp.ok) {
+      const errData = await resp.json().catch(() => ({}));
+      throw new Error(errData.error?.message || `API error ${resp.status}`);
+    }
+
+    const data = await resp.json();
+    const raw = data.content.find(b => b.type === 'text')?.text || '';
+    const clean = raw.replace(/```json|```/g, '').trim();
+    result = JSON.parse(clean);
+
+  } catch(err) {
+    prog.style.display = 'none';
+    btn.disabled = false;
+    alert('Screen failed: ' + err.message);
+    return;
+  }
+
+  result.ran_at = new Date().toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+  result.overrides = { price: ovPrice, cap: ovCap, context: ovCtx };
+
+  fill.style.width = '100%';
+  status.textContent = 'Complete.';
+
+  d.screen = result;
+  save();
+
+  setTimeout(() => {
+    prog.style.display = 'none';
+    btn.disabled = false;
+
+    // Update verdict pill
+    const pill = document.getElementById('verdictPill');
+    if (pill) { pill.className = 'verdict-pill ' + result.verdict; pill.textContent = result.verdict; }
+
+    // Show result
+    const resultEl = document.getElementById('screenerResult');
+    if (resultEl) { resultEl.innerHTML = renderScreenResult(result); resultEl.style.display = 'block'; }
+
+    renderPipeline();
+  }, 400);
+}
+
+function clearScreen(id) {
+  const d = getDeal(id);
+  if (!d) return;
+  d.screen = null;
+  save();
+  renderPipeline();
+  selectDeal(id);
+}
+
+function updateStage(id, stage) {
+  const d = getDeal(id);
+  if (!d) return;
+  d.stage = stage;
+  save();
+  renderPipeline();
+}
+
+function deleteDeal(id) {
+  if (!confirm('Delete this deal? This cannot be undone.')) return;
+  deals = deals.filter(x => x.id !== id);
+  activeDealId = null;
+  save();
+  renderPipeline();
+  document.getElementById('emptyState').style.display = 'flex';
+  document.getElementById('detailView').style.display = 'none';
+}
+
+function copyBrief() {
+  const d = getDeal();
+  if (!d?.screen) return;
+  const s = d.screen;
+  const overrideNote = s.overrides?.price || s.overrides?.cap
+    ? `\nOVERRIDES: ${s.overrides.price ? 'Price '+fmtM(s.overrides.price) : ''} ${s.overrides.cap ? 'Cap '+s.overrides.cap+'%' : ''}`.trim()
+    : '';
+  const lines = [
+    `OM SCREENING BRIEF`,
+    `${'='.repeat(60)}`,
+    `${d.name || 'N/A'} | ${d.type || ''} | ${d.city || ''}, ${d.state || ''}`,
+    `Asking: ${fmtM(d.asking_price)} | Cap: ${d.asking_cap_pct ? d.asking_cap_pct+'%' : 'N/A'} | NOI: ${fmtM(d.noi)}`,
+    overrideNote,
+    ``,
+    `VERDICT: ${s.verdict}  (${s.ran_at})`,
+    ``,
+    `RATIONALE`,
+    s.verdict_rationale || '',
+    ``,
+    `INVESTMENT THESIS`,
+    s.investment_thesis || '',
+    ``,
+    `METRICS`,
+    ...(s.metrics || []).map(m => `  ${m.name}: ${m.value} | Hurdle ${m.hurdle} | ${(m.status||'').toUpperCase()}`),
+    ``,
+    `RISK FLAGS`,
+    ...(s.risk_flags || []).map(f => `  [${(f.severity||'').toUpperCase()}] ${f.flag}`),
+    ``,
+    `NEXT STEPS`,
+    ...(s.next_steps || []).map((st, i) => `  ${i+1}. ${st}`),
+    ``,
+    `Data Quality: ${(s.data_quality||'').toUpperCase()} — ${s.data_quality_note || ''}`
+  ].filter(l => l !== undefined);
+
+  navigator.clipboard.writeText(lines.join('\n'))
+    .then(() => alert('Brief copied to clipboard.'))
+    .catch(() => alert('Copy failed — try selecting and copying manually.'));
+}
+
+// ── Init ───────────────────────────────────────────────────────────────
+renderPipeline();
+if (deals.length) selectDeal(deals[0].id);
+</script>
+</body>
+</html>
