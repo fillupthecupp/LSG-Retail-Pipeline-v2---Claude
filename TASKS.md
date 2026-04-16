@@ -1,6 +1,6 @@
 # Tasks — Retail Deal Pipeline & Screener
 **Active phases only. Deferred work goes to BACKLOG.md.**
-**Last updated:** 2026-04-16
+**Last updated:** 2026-04-16 (Phase 3 preflight complete)
 
 ---
 
@@ -16,8 +16,8 @@
 - [x] Commit api/blob-upload.js (committed in Phase 1 session)
 - [x] Create .env.example with: `ANTHROPIC_API_KEY`, `BLOB_READ_WRITE_TOKEN`, `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`
 - [x] Add `dist/` and `node_modules/` to .gitignore
-- [ ] Inspect Repo A and answer the 5 open questions in MERGE_PLAN.md
-- [ ] Compare Repo A schema v2.0 columns against Repo B PIPELINE_COLUMNS; document resolution in PROJECT_OPERATING_LOG.md
+- [x] Inspect Repo A and answer the 5 open questions in MERGE_PLAN.md (answered via source inspection + user authority — logged in PROJECT_OPERATING_LOG.md 2026-04-16)
+- [x] Compare Repo A schema v2.0 columns against Repo B PIPELINE_COLUMNS; document resolution in PROJECT_OPERATING_LOG.md (field map produced in Phase 3 preflight plan)
 
 ---
 
@@ -29,13 +29,13 @@
 - [x] Create `src/lib/supabase.js` — Supabase client initialization using env vars
 - [x] Create `db/schema.sql` — Repo A authority: snake_case, NUMERIC fields, raw_data JSONB
 - [x] Create `src/lib/dealMapper.js` — fromDbRow / toDbRow with semantic renames and parseNumeric
-- [ ] Create deals table in Supabase project (run db/schema.sql in Supabase SQL editor)
+- [x] Create deals table in Supabase project (run db/schema.sql in Supabase SQL editor)
 - [x] Replace `localStorage.setItem` in `addDeal()` with Supabase insert
 - [x] Replace `localStorage.setItem` in `saveDeal()` with Supabase update
 - [x] Replace `localStorage.removeItem` in `deleteDeal()` with Supabase delete
 - [x] Replace `localStorage.getItem` on initial load with Supabase select
 - [x] Remove all remaining localStorage references from App.jsx
-- [ ] Test: add deal → refresh page → deal persists with all fields intact
+- [x] Test: add deal → refresh page → deal persists ✓ edit ✓ delete ✓ — MILESTONE 1 COMPLETE
 
 **Note:** Decompose App.jsx into components naturally as part of this phase — not as a separate sprint. Minimum decomposition: `useDeals` hook, `DealTable` component, `DealForm` component.
 
@@ -43,16 +43,23 @@
 
 ## Phase 3 — Port Repo A extraction/schema logic
 **Goal:** PDF ingest uses Repo A's two-agent pattern and writes directly to Supabase
-**Gate:** Upload PDF → extract → row in Supabase → deal visible in pipeline UI
+**Gate:** Upload PDF → extract → row in Supabase → deal opens in edit modal → analyst-owned fields blank
 
-- [ ] Read and understand Repo A's two-agent extraction pattern before touching any code
-- [ ] Commit current `api/ingest-om.js` with a clear message before replacing it
-- [ ] Replace `api/ingest-om.js` with Repo A two-agent extraction logic
-- [ ] Confirm extracted field names match Supabase schema v2.0 column names exactly
-- [ ] Update ingest endpoint to write extracted deal to Supabase (not return JSON to frontend)
-- [ ] Update frontend to refresh deal list from Supabase after ingest (not read from API response)
-- [ ] Update `vercel.json` if new route timeout differs from current 60s
-- [ ] Test: upload PDF → fields extracted → row appears in Supabase → row appears in pipeline UI
+**Blocker:** Vercel plan must be Pro (300s max) — two-agent flow exceeds 60s Hobby limit. Confirm before deploying.
+**Blocker:** `BLOB_READ_WRITE_TOKEN` must be set in `.env.local` and Vercel dashboard before end-to-end testing.
+
+- [x] Read and understand Repo A's two-agent extraction pattern (lsg_ingest(1).html inspected 2026-04-16)
+- [ ] Commit current `api/ingest-om.js` — "chore: preserve Repo B single-agent ingest before Phase 3 replacement"
+- [ ] Replace `api/ingest-om.js` — READER_SYSTEM + STANDARDIZER_SYSTEM prompts (verbatim), two-agent flow, Supabase write
+- [ ] Update `vercel.json` — ingest route maxDuration: 60 → 120
+- [ ] Update `fromDbRow` in `src/lib/dealMapper.js` — additive v2 schema fallbacks only (see field map in log)
+- [ ] Update `handleIngest` in `src/App.jsx` — receive dealId → re-fetch Supabase → open edit modal
+- [ ] Test: upload PDF → Supabase row appears → deal opens in edit modal
+- [ ] Verify: `purchase_price` null in DB row (analyst-owned, not extracted)
+- [ ] Verify: `going_in_cap` null in DB row (analyst-owned, not extracted)
+- [ ] Verify: `raw_data` contains full Agent 2 output with no `_reader_narrative` key
+- [ ] Verify: `source_files` contains filename
+- [ ] Verify: analyst enters Purchase Price and Going-In Cap Rate → save → full round-trip completes
 
 ---
 

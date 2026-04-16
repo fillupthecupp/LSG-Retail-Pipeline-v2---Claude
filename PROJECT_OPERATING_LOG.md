@@ -35,21 +35,21 @@ This project follows the operating discipline from the Hospitality Pricing Copil
 ## Current Status
 
 **Date:** 2026-04-16
-**Phase:** 1 — Planning artifacts and base repo setup
-**Status:** In progress
+**Phase:** 3 — Preflight planning complete; awaiting implementation approval
+**Status:** Phase 1 complete ✓ | Phase 2 complete ✓ | Phase 3 preflight complete, not yet started
 
-**Completed this session:**
-- Full repo assessment of Repo B
-- Repo role assessment: Repo B in the 5-layer target product
-- Merge architecture decision: Repo B = base, Repo A = logic/schema authority
-- Created PRD.md, MERGE_PLAN.md, PROJECT_OPERATING_LOG.md, TASKS.md, BACKLOG.md
+**Completed as of this update:**
+- Phases 1 and 2 fully gated and complete
+- Milestone 1 confirmed (deal add → Supabase → refresh → edit → delete all working)
+- Repo A source files (lsg_ingest(1).html, lsg_one_pager(4).html) inspected in full
+- All 5 MERGE_PLAN.md open questions answered — logged below
+- Phase 3 preflight plan produced — field map, API contract, conflict log, implementation order
+- 5 Repo A vs. locked-decision conflicts identified and resolved (C1–C5, logged below)
 
-**Remaining Phase 1 tasks:**
-- Commit api/blob-upload.js (currently uncommitted in working tree)
-- Create .env.example
-- Add dist/ to .gitignore
-- Inspect Repo A and answer the 5 open questions in MERGE_PLAN.md
-- Resolve field schema: compare Repo A v2.0 against Repo B PIPELINE_COLUMNS
+**Blockers before Phase 3 implementation begins:**
+- Vercel plan must be confirmed as Pro (300s) — two-agent flow exceeds 60s Hobby limit
+- BLOB_READ_WRITE_TOKEN must be set — PDF upload cannot be tested without it
+- User must approve Phase 3 implementation plan
 
 ---
 
@@ -133,8 +133,8 @@ See BACKLOG.md for the full deferred list.
 
 | ID | Milestone | Description | Status |
 |---|---|---|---|
-| M0 | Planning complete | All Phase 1 artifacts created, repo clean, open questions answered | In progress |
-| M1 | Supabase integrated | localStorage removed, deals persist in Supabase | Not started |
+| M0 | Planning complete | All Phase 1 artifacts created, repo clean, open questions answered | **Complete** 2026-04-16 |
+| M1 | Supabase integrated | localStorage removed, deals persist in Supabase | **Complete** 2026-04-16 |
 | M2 | Extraction ported | Two-agent pattern live, deals write to Supabase on ingest | Not started |
 | M3 | One-pager live | IC memo generation working from real deal record | Not started |
 | M4 | v1 complete | All 6 PRD success criteria pass in deployed Vercel environment | Not started |
@@ -142,6 +142,80 @@ See BACKLOG.md for the full deferred list.
 ---
 
 ## Log
+
+### 2026-04-16 — Phase 3 preflight: Repo A source inspection and implementation plan
+
+**What happened:**
+- Repo A source files pulled from GitHub and inspected in full: `lsg_ingest(1).html`, `lsg_one_pager(4).html`
+- All 5 MERGE_PLAN.md open questions answered (see below)
+- Phase 3 implementation plan produced — field map, API contract, file change list, conflict log, implementation order
+- Locked decisions C1–C5 established for Phase 3 ingestion contract
+
+**Answers to the 5 MERGE_PLAN.md open questions:**
+
+1. **Exact column names and types in schema v2.0:** Confirmed in prior session via user-provided authority. snake_case, NUMERIC for financial fields, JSONB for raw_data, TEXT[] for source_files — already applied in db/schema.sql.
+
+2. **Superset or subset of Repo B's 18 fields:** Repo A schema v2.0 is a major superset. The 18 Repo B fields are a shallow subset. Repo A's raw_data JSONB contains deeply nested structures for tenants, cash flows, market, demographics, returns, capital stack, and more. The 18 Repo B UI fields map to a small fraction of the Agent 2 output schema. Field map produced in Phase 3 preflight plan (see below).
+
+3. **Two-agent pattern — two calls or one:** Two sequential Anthropic API calls. Agent 1 (Reader): narrative text output, `max_tokens: 8000`. Agent 2 (Standardizer): LSG schema JSON output, `max_tokens: 16000`. Model for both: `claude-sonnet-4-6`.
+
+4. **Supabase Auth or anon key:** Anon key only. No auth. RLS is deliberately disabled (single-tenant internal tool). Confirmed in source: `'apikey': key` where key is the anon public key.
+
+5. **One-pager output format:** Rendered HTML (landscape print-optimized, 4-column layout). Built dynamically via `buildOP(d)` from `raw_data` JSONB. Exported to PDF via browser print dialog. Phase 4 will port this as `api/generate-memo.js`.
+
+**Phase 3 field map (Agent 2 raw_data → Repo B UI form):**
+
+| UI field (camelCase) | Source in raw_data (Agent 2 schema) | Notes |
+|---|---|---|
+| propertyName | `raw.deal_name` (top-level) | Agent 2 top-level key |
+| propertyAddress | `raw.address` (top-level, concatenated) | Agent 2 concatenates address+city+state |
+| market | `raw.market.submarket` | raw.market is an object — string check required in fromDbRow |
+| assetType | `raw.property.type` | |
+| sf | `raw.property.size_sf` | |
+| acreage | `raw.property.acreage` | |
+| yearBuiltRenovated | `raw.property.vintage` | |
+| parkingCount | `raw.property.parking_ratio` | |
+| occupancy | `raw.property.occupancy` | |
+| walt | `raw.property.walt` | |
+| askingPrice | **blank** | Analyst-owned; `sources_uses.purchase_price` present in raw_data for reference only |
+| noi | `raw.cash_flows.noi[0]` (first year) | Array; take first non-null value |
+| capRate | **blank** | Analyst-owned; `returns.going_in_cap` present in raw_data for reference only |
+| broker | `raw.transaction.sourcing` | |
+| keyAnchors | derived from `raw.top_tenants[0..2].name` | Join first 3 names |
+| bidDate | `raw.transaction.bid_deadline` or `raw.transaction.call_for_offers` | |
+| notes | `raw.investment_thesis.broker_headline` | |
+| stage | `row.status` (scalar column) | |
+
+**Phase 3 conflicts logged (C1–C5):**
+
+| # | Field | Repo A behavior | Locked decision | Resolution |
+|---|---|---|---|---|
+| C1 | purchase_price | Extracted and stored as NUMERIC scalar | Analyst-owned — null after ingest | Null in scalar; value preserved in raw_data.sources_uses.purchase_price |
+| C2 | going_in_cap | Extracted and stored as NUMERIC scalar | Analyst-owned — null after ingest | Null in scalar; value preserved in raw_data.returns.going_in_cap |
+| C3 | schema_version | Repo A writes '2.0' | toDbRow writes '1.0' | Ingest route writes '2.0'; toDbRow stays '1.0' — clean distinction |
+| C4 | model string | claude-sonnet-4-6 | Current Repo B: claude-3-5-sonnet-20241022 | Update to claude-sonnet-4-6 |
+| C5 | screen column | Repo A patches screen JSONB after screener | Column not in our schema | Defer to screener phase |
+
+**Locked rules for Phase 3 implementation (set this session):**
+1. raw_data = Agent 2 normalized output only; _reader_narrative explicitly deleted before storage
+2. conflict_flags and extraction_meta preserved in raw_data as-is
+3. purchase_price and going_in_cap scalars are always null after ingest (analyst-owned)
+4. After ingest succeeds, newly created deal auto-opens in edit modal — extracted fields visible, analyst-owned fields blank
+5. source_files = [filename] set by ingest route from request body, not extracted from OM
+6. Vercel maxDuration for ingest route must increase to 120s (requires Pro plan)
+7. No screener, no one-pager in Phase 3
+
+**Phase 3 API contract (pending user approval):**
+- Request: POST /api/ingest-om → { filename, url }
+- Success: { ok: true, dealId, fieldsPopulated, conflicts, confidence }
+- Error: { ok: false, error, stage: 'reader|standardizer|save' }
+- Frontend: receive dealId → re-fetch Supabase → find deal → open edit modal
+- No extracted field values returned to frontend
+
+**Known limitation noted:**
+- After analyst's first edit+save of a v2-ingested deal, raw_data.market (Agent 2 object) is overwritten with a string via buildRawData. Market subfields (gs_grade, avg_rent_growth, etc.) are lost from top-level. Submarket string is preserved. Acceptable for v1.
+
+---
 
 ### 2026-04-16 — Semantic correction + validation-prep pass
 

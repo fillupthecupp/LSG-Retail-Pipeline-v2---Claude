@@ -1,7 +1,7 @@
 # Merge Plan — Retail Deal Pipeline & Screener
-**Version:** 1.0
+**Version:** 1.1
 **Last Updated:** 2026-04-16
-**Status:** Approved, pre-execution
+**Status:** Execution in progress — Phase 1 complete, Phase 2 complete, Phase 3 preflight complete
 
 ---
 
@@ -131,17 +131,24 @@ These decisions are final for the merge. Do not re-litigate in implementation se
 
 ---
 
-## Open Questions Before Phase 2 Starts
+## Open Questions — RESOLVED 2026-04-16
 
-These must be answered by inspecting Repo A. Do not begin Phase 2 until all are resolved.
+All 5 questions answered by direct source inspection of `lsg_ingest(1).html` and `lsg_one_pager(4).html`. Full answers logged in PROJECT_OPERATING_LOG.md.
 
-1. What are the exact column names and types in Repo A's schema v2.0?
-2. Does Repo A's schema include all 18 fields from Repo B's PIPELINE_COLUMNS, or is it a subset/superset?
-3. What does Repo A's two-agent extraction pattern look like — two separate API calls, two Claude messages in one call, or something else?
-4. Does Repo A use Supabase Auth, or is it anonymous/service-role key access?
-5. What does Repo A's one-pager output — markdown, HTML, or a rendered component?
+1. **Exact column names and types in schema v2.0?**
+   snake_case throughout. Scalar columns: deal_name TEXT, address TEXT, asset_type TEXT, purchase_price NUMERIC, going_in_cap NUMERIC, irr_levered_5 NUMERIC, moic_5 NUMERIC, status TEXT, source_broker TEXT, assignee TEXT, source_files TEXT[], schema_version TEXT. Plus: raw_data JSONB, ingested_at TIMESTAMPTZ, created_at TIMESTAMPTZ, updated_at TIMESTAMPTZ. Already applied in db/schema.sql.
 
-Document answers in a new PROJECT_OPERATING_LOG.md entry before Phase 2 begins.
+2. **Superset or subset of Repo B's 18 fields?**
+   Major superset. The 18 Repo B UI fields are a shallow subset of the Agent 2 JSON schema, which has deeply nested objects for tenants, cash flows, market, demographics, returns, capital stack, and more. All 18 Repo B fields map to Agent 2 paths — field map produced in Phase 3 preflight plan.
+
+3. **Two-agent pattern — two API calls or one?**
+   Two sequential Anthropic API calls. Agent 1 (Reader): `claude-sonnet-4-6`, `max_tokens: 8000`, outputs narrative text. Agent 2 (Standardizer): `claude-sonnet-4-6`, `max_tokens: 16000`, outputs LSG schema JSON.
+
+4. **Supabase Auth or anon key?**
+   Anon key only. No Supabase Auth. RLS intentionally disabled for single-tenant internal use.
+
+5. **One-pager output format?**
+   Rendered HTML — landscape print-optimized, 4-column layout. Built dynamically from `raw_data` JSONB. PDF export via browser print dialog. Will be ported as `api/generate-memo.js` in Phase 4.
 
 ---
 
