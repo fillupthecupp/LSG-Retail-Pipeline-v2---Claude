@@ -482,8 +482,9 @@ export default function App() {
       {showAdd && (
         <DealForm
           title="Add New Deal"
-          subtitle="Enter deal details below and save."
+          subtitle="Upload OM to auto-fill, then review and save."
           initial={EMPTY_FORM}
+          showIngest
           onSave={addDeal}
           onClose={()=>setShowAdd(false)}
         />
