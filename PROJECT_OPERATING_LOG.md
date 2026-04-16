@@ -143,6 +143,37 @@ See BACKLOG.md for the full deferred list.
 
 ## Log
 
+### 2026-04-16 — Phase 2 implementation: Supabase persistence, localStorage removed
+
+**What happened:**
+- Completed remaining Phase 1 items: .gitignore, .env.example, committed api/blob-upload.js
+- Installed @supabase/supabase-js
+- Created src/lib/supabase.js — Vite-compatible client using VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+- Created db/schema.sql — deals table with Repo B's 18 camelCase fields as scalar TEXT columns
+- Replaced all localStorage reads/writes in src/App.jsx with Supabase CRUD
+- Added loading state (async initial fetch)
+- Confirmed: `grep -r 'localStorage' src/` returns zero matches
+
+**Schema decisions made this session:**
+- Columns use camelCase quoted identifiers matching App.jsx field names — no mapping layer needed
+- All deal field columns are TEXT — preserves string formatting from OMs
+- id: UUID (auto-generated), dateAdded: TEXT (YYYY-MM-DD), created_at/updated_at: TIMESTAMPTZ
+- RLS: permissive anon policy — single-tenant, no auth
+- NOT implementing Repo A JSONB design — deferred to Phase 3
+- NOT adding 'screen' column — purpose unknown from Repo B; must confirm from Repo A
+
+**Pending before Milestone 1 gate passes:**
+- You must create a Supabase project (if not done already)
+- Run db/schema.sql in the Supabase SQL editor
+- Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env.local
+- Run `npm run dev` and validate the 7-step round-trip test
+
+**Blockers (must resolve before Phase 3):**
+- What is the `screen` column in Repo A's live DB? Do not add it without understanding its semantics.
+- Repo A schema v2.0 column names likely differ — schema migration required in Phase 3.
+
+---
+
 ### 2026-04-16 — Intake, planning, and merge architecture
 
 **What happened:**
