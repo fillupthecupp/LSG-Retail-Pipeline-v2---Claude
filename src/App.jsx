@@ -51,6 +51,29 @@ function parseSortable(v) {
   return !Number.isNaN(n) && /\d/.test(s) ? n : s.toLowerCase();
 }
 
+// Display-only: format a stored price string as "$X,XXX,XXX".
+// Returns null for blank/null or any value that isn't a clean bare number
+// after stripping $ , and whitespace (e.g. "Best Offer", "$20M" → null → em dash).
+function formatUSD(v) {
+  if (v == null || v === '') return null;
+  const cleaned = String(v).replace(/[$,\s]/g, '');
+  if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return null;
+  const n = parseFloat(cleaned);
+  if (!Number.isFinite(n)) return null;
+  return '$' + Math.round(n).toLocaleString('en-US');
+}
+
+// Display-only: normalize a WALT-ish string ("±4.8 Yrs.", "24.387", "4.8")
+// to a plain "N.N" form. Returns null if no number is found.
+function formatWalt(v) {
+  if (v == null || v === '') return null;
+  const m = String(v).match(/-?\d+(?:\.\d+)?/);
+  if (!m) return null;
+  const n = parseFloat(m[0]);
+  if (!Number.isFinite(n)) return null;
+  return n.toFixed(1);
+}
+
 function getSortValue(deal, key) {
   if (key==='stage') return STAGES.indexOf(deal.stage)??99;
   return parseSortable(deal[key]);
@@ -69,7 +92,7 @@ function StageBadge({ stage }) {
 
 // ── SUPPORT TAB COMPONENTS ──────────────────────────────────────────────────
 
-function SupportCard({ title, children, defaultOpen = true }) {
+function SupportCard({ title, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',overflow:'hidden',boxShadow:'var(--sh)'}}>
@@ -436,6 +459,365 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
   );
 }
 
+// ── ONE PAGER TAB ───────────────────────────────────────────────────────────
+
+function OnePagerTab({ deals }) {
+  const [selectedId, setSelectedId] = useState('');
+
+  useEffect(() => {
+    if (!deals.length) { setSelectedId(''); return; }
+    if (!selectedId || !deals.find(d => d.id === selectedId)) {
+      setSelectedId(deals[0].id);
+    }
+  }, [deals, selectedId]);
+
+  const deal = deals.find(d => d.id === selectedId);
+  const generatedAt = new Date().toLocaleString('en-US', {
+    month:'short', day:'numeric', year:'numeric', hour:'numeric', minute:'2-digit',
+  });
+
+  // Empty state — no deals at all
+  if (!deals.length) {
+    return (
+      <div style={{
+        background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',
+        boxShadow:'var(--sh)',padding:'60px 24px',textAlign:'center',
+      }}>
+        <div style={{fontSize:'32px',marginBottom:10,opacity:.22}}>📄</div>
+        <div style={{fontSize:'12px',fontWeight:500,color:'var(--muted)',marginBottom:4}}>
+          Select a deal from the pipeline to preview a one-pager.
+        </div>
+        <div style={{fontSize:'11px',color:'var(--dim)'}}>
+          Add a deal in the PIPELINE tab to get started.
+        </div>
+      </div>
+    );
+  }
+
+  if (!deal) return null;
+
+  // Styles
+  const appCardStyle = {
+    background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',
+    boxShadow:'var(--sh)',overflow:'hidden',
+  };
+  const ghostBtn = {
+    padding:'6px 11px',fontSize:'11px',fontWeight:600,cursor:'pointer',
+    border:'1px solid var(--border2)',background:'var(--surface2)',color:'var(--muted)',
+    borderRadius:'5px',fontFamily:'inherit',transition:'all .15s',
+  };
+  const primaryBtn = {
+    ...ghostBtn,background:'#111',color:'#fff',borderColor:'#111',
+  };
+
+  // Paper-style one-pager inner styles (adapted from lsg_one_pager_v4.html:
+  // keeps the example's institutional dark-header section strip, but scales
+  // typography up from 7.5–9px print sizes to screen-readable 9–11px)
+  const paperStyle = {
+    background:'#ffffff',border:'1px solid #e5e3df',borderRadius:'4px',
+    boxShadow:'0 1px 2px rgba(0,0,0,.04)',overflow:'hidden',color:'#111',
+  };
+  const sectionHdr = {
+    fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.09em',
+    background:'#111',color:'#fff',padding:'4px 8px',
+  };
+  const sectionBody = { padding:'6px 10px' };
+  const kvRow = {
+    display:'flex',justifyContent:'space-between',gap:6,padding:'2.5px 0',
+    fontSize:'10.5px',borderBottom:'1px solid #f4f3f1',lineHeight:1.4,
+  };
+  const kvRowLast = { ...kvRow, borderBottom:'none' };
+  const kvK = { color:'#777',flexShrink:0 };
+  const kvV = { fontWeight:500,color:'#111',textAlign:'right',flex:1 };
+  const sectionWrap = {
+    border:'1px solid #e5e3df',borderRadius:'3px',overflow:'hidden',marginBottom:6,
+  };
+
+  const em = '—';
+  const V = (v) => (v == null || v === '') ? em : v;
+
+  // Render a compact key/value block
+  const KV = ({ rows }) => (
+    <div>
+      {rows.map((r, i) => (
+        <div key={r.k} style={i === rows.length - 1 ? kvRowLast : kvRow}>
+          <span style={kvK}>{r.k}</span>
+          <span style={kvV}>{V(r.v)}</span>
+        </div>
+      ))}
+    </div>
+  );
+
+  const Section = ({ title, children, placeholder }) => (
+    <div style={sectionWrap}>
+      <div style={sectionHdr}>{title}</div>
+      <div style={sectionBody}>
+        {children}
+        {placeholder && (
+          <div style={{fontSize:'9px',color:'#b45309',fontStyle:'italic',marginTop:4,opacity:.8}}>
+            Placeholder — data not yet modeled in this deal record.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Key Anchors as a list (split on comma / newline / pipe)
+  const anchors = (deal.keyAnchors || '')
+    .split(/[\n,|;]/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  // Count placeholder-heavy areas so we can offer the "fields not yet available" banner
+  const unavailableCount = [
+    !deal.market, !deal.assetType, !deal.sf, !deal.occupancy, !deal.walt,
+    !deal.askingPrice, !deal.capRate, !deal.noi, !deal.broker, !deal.bidDate,
+  ].filter(Boolean).length;
+
+  const dealTitle = deal.propertyName || 'Untitled deal';
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+
+      {/* ── Action / header bar ─────────────────────────── */}
+      <div style={appCardStyle}>
+        <div style={{
+          display:'flex',alignItems:'center',gap:14,padding:'10px 14px',flexWrap:'wrap',
+        }}>
+          <div style={{display:'flex',alignItems:'baseline',gap:10,flex:'1 1 auto',minWidth:0}}>
+            <div style={{fontSize:'14px',fontWeight:700,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+              {dealTitle}
+            </div>
+            <div style={{fontSize:'10px',color:'var(--muted)',whiteSpace:'nowrap'}}>
+              Generated {generatedAt}
+            </div>
+          </div>
+          <select
+            value={selectedId}
+            onChange={e => setSelectedId(e.target.value)}
+            style={{
+              background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:'5px',
+              padding:'5px 8px',fontSize:'11px',color:'var(--text)',fontFamily:'inherit',
+              outline:'none',cursor:'pointer',minWidth:200,
+            }}
+          >
+            {deals.map(d => (
+              <option key={d.id} value={d.id}>{d.propertyName || d.propertyAddress || 'Untitled deal'}</option>
+            ))}
+          </select>
+          <div style={{display:'flex',gap:6,flexWrap:'wrap'}}>
+            <button type="button" style={ghostBtn} disabled title="Not yet wired">Layout</button>
+            <button type="button" style={ghostBtn} disabled title="Not yet wired">Edit Data</button>
+            <button type="button" style={ghostBtn} disabled title="Not yet wired">DB Sync</button>
+            <button type="button" style={ghostBtn} disabled title="Not yet wired">Clear</button>
+            <button type="button" style={primaryBtn} disabled title="Not yet wired">Print / Export PDF</button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Optional gap banner ─────────────────────────── */}
+      {unavailableCount > 0 && (
+        <div style={{
+          background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'6px',
+          padding:'8px 14px',fontSize:'11px',color:'#92400e',
+          display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,
+        }}>
+          <span>
+            <strong>{unavailableCount}</strong> fields not yet available — placeholders are shown where data is missing.
+          </span>
+          <span style={{fontSize:'10px',color:'#b45309',opacity:.8}}>Fill in from the Pipeline edit modal.</span>
+        </div>
+      )}
+
+      {/* ── Paper: title block + sections ────────────────── */}
+      <div style={paperStyle}>
+
+        {/* Title strip */}
+        <div style={{padding:'10px 14px 8px',borderBottom:'1px solid #e5e3df'}}>
+          <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+            <div style={{minWidth:0,flex:'1 1 60%'}}>
+              <div style={{fontSize:'16px',fontWeight:700,letterSpacing:'.01em',color:'#111',lineHeight:1.2}}>
+                {dealTitle}
+              </div>
+              {deal.propertyAddress && (
+                <div style={{fontSize:'10.5px',color:'#555',marginTop:2}}>{deal.propertyAddress}</div>
+              )}
+            </div>
+            <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
+              {deal.stage && (
+                <span style={{
+                  fontSize:'8.5px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',
+                  background:'#111',color:'#fff',padding:'3px 7px',borderRadius:2,
+                }}>{deal.stage}</span>
+              )}
+              {deal.assetType && (
+                <span style={{
+                  fontSize:'8.5px',fontWeight:600,letterSpacing:'.03em',
+                  background:'#f0fdf4',border:'1px solid #bbf7d0',color:'#15803d',
+                  padding:'2px 7px',borderRadius:2,
+                }}>{deal.assetType}</span>
+              )}
+              {deal.market && (
+                <span style={{
+                  fontSize:'8.5px',fontWeight:600,letterSpacing:'.03em',
+                  background:'#eff6ff',border:'1px solid #bfdbfe',color:'#1e40af',
+                  padding:'2px 7px',borderRadius:2,
+                }}>{deal.market}</span>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Three-box head row: Property / Transaction / Scorecard */}
+        <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:6,padding:'8px 10px 4px'}}>
+          {/* Property */}
+          <div style={sectionWrap}>
+            <div style={sectionHdr}>Property</div>
+            <div style={sectionBody}>
+              <KV rows={[
+                {k:'Type',     v: deal.assetType},
+                {k:'Size',     v: deal.sf},
+                {k:'Acreage',  v: deal.acreage},
+                {k:'Vintage',  v: deal.yearBuiltRenovated},
+                {k:'Parking',  v: deal.parkingCount},
+                {k:'Leasing',  v: [
+                  deal.occupancy,
+                  formatWalt(deal.walt) ? formatWalt(deal.walt)+' WALT' : null,
+                ].filter(Boolean).join(' | ') || em},
+              ]}/>
+            </div>
+          </div>
+          {/* Transaction */}
+          <div style={sectionWrap}>
+            <div style={sectionHdr}>Transaction</div>
+            <div style={sectionBody}>
+              <KV rows={[
+                {k:'Status',    v: deal.stage},
+                {k:'Strategy',  v: null},
+                {k:'Seller',    v: null},
+                {k:'Sourcing',  v: deal.broker},
+                {k:'Bid Date',  v: deal.bidDate},
+                {k:'Source',    v: (deal.sourceFiles && deal.sourceFiles[0]) || null},
+              ]}/>
+            </div>
+          </div>
+          {/* Scorecard (all placeholders) */}
+          <div style={sectionWrap}>
+            <div style={sectionHdr}>Scorecard</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:4,padding:'8px 8px 10px'}}>
+              {['Overall','Market','Property','Location','Biz Plan'].map(lbl => (
+                <div key={lbl} style={{textAlign:'center'}}>
+                  <div style={{fontSize:'8px',textTransform:'uppercase',letterSpacing:'.07em',color:'#777',fontWeight:600,marginBottom:2}}>{lbl}</div>
+                  <div style={{fontSize:'15px',fontWeight:700,color:'#a8a5a1'}}>—</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Main grid */}
+        <div style={{display:'grid',gridTemplateColumns:'1.15fr 1fr 1fr',gap:6,padding:'4px 10px 10px'}}>
+          {/* Column 1 */}
+          <div>
+            <Section title="Summary Metrics">
+              <KV rows={[
+                {k:'Purchase Price', v: formatUSD(deal.askingPrice)},
+                {k:'Going-In Cap',   v: deal.capRate},
+                {k:'NOI',            v: deal.noi},
+                {k:'GLA (SF)',       v: deal.sf},
+                {k:'Occupancy',      v: deal.occupancy},
+                {k:'WALT',           v: formatWalt(deal.walt)},
+              ]}/>
+            </Section>
+            <Section title="Market & Submarket">
+              <KV rows={[
+                {k:'Market',           v: deal.market},
+                {k:'Submarket',        v: null},
+                {k:'Market Cap Range', v: null},
+                {k:'Rent Growth (3Y)', v: null},
+                {k:'Population (3-mi)',v: null},
+              ]}/>
+            </Section>
+          </div>
+          {/* Column 2 */}
+          <div>
+            <Section title="Returns Summary">
+              <KV rows={[
+                {k:'Levered IRR',    v: null},
+                {k:'MOIC',           v: null},
+                {k:'Cash-on-Cash',   v: null},
+                {k:'DSCR',           v: null},
+                {k:'Debt Yield',     v: null},
+              ]}/>
+            </Section>
+            <Section title="Capital Sources">
+              <KV rows={[
+                {k:'Senior Debt',  v: null},
+                {k:'LTV',          v: null},
+                {k:'Rate',         v: null},
+                {k:'Term',         v: null},
+                {k:'Equity',       v: null},
+              ]}/>
+            </Section>
+          </div>
+          {/* Column 3 */}
+          <div>
+            <Section title="Sources & Uses">
+              <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'#777',marginBottom:2}}>Sources</div>
+              <KV rows={[
+                {k:'Senior Debt',  v: null},
+                {k:'LP Equity',    v: null},
+                {k:'GP Equity',    v: null},
+              ]}/>
+              <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'#777',margin:'6px 0 2px'}}>Uses</div>
+              <KV rows={[
+                {k:'Purchase Price', v: formatUSD(deal.askingPrice)},
+                {k:'Closing Costs',  v: null},
+                {k:'Reserves',       v: null},
+              ]}/>
+            </Section>
+            <Section title="Key Anchors / Top Tenants">
+              {anchors.length > 0 ? (
+                <div style={{display:'flex',flexDirection:'column',gap:2}}>
+                  {anchors.map((a, i) => (
+                    <div key={i} style={{fontSize:'10.5px',color:'#111',padding:'1.5px 0',borderBottom: i===anchors.length-1 ? 'none' : '1px solid #f4f3f1'}}>
+                      {a}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{fontSize:'10.5px',color:'#777',fontStyle:'italic'}}>No anchors recorded.</div>
+              )}
+            </Section>
+          </div>
+        </div>
+
+        {/* Notes strip */}
+        {deal.notes && (
+          <div style={{padding:'4px 10px 10px'}}>
+            <div style={sectionWrap}>
+              <div style={sectionHdr}>Notes / Overview</div>
+              <div style={{...sectionBody,fontSize:'10.5px',color:'#111',lineHeight:1.5,whiteSpace:'pre-wrap'}}>
+                {deal.notes}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer strap */}
+        <div style={{
+          display:'flex',justifyContent:'space-between',alignItems:'center',
+          padding:'6px 14px',borderTop:'1px solid #e5e3df',background:'#fafaf9',
+          fontSize:'9px',color:'#777',letterSpacing:'.04em',textTransform:'uppercase',
+        }}>
+          <span>Confidential &amp; Proprietary — LIGHTSTONE</span>
+          <span>{new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'})}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── COMPARE TAB ─────────────────────────────────────────────────────────────
 
 const COMPARE_ROWS = [
@@ -741,7 +1123,7 @@ export default function App() {
 
         {/* Tab strip */}
         <div style={{display:'flex',gap:0,borderBottom:'1px solid var(--border)',marginBottom:0}}>
-          {['PIPELINE','COMPARE','SUPPORT'].map(tab => (
+          {['PIPELINE','COMPARE','ONEPAGER','SUPPORT'].map(tab => (
             <button key={tab} onClick={()=>setActiveTab(tab)}
               style={{
                 padding:'8px 16px',fontSize:'11px',fontWeight:600,cursor:'pointer',
@@ -755,11 +1137,13 @@ export default function App() {
                 textTransform:'uppercase',letterSpacing:'.06em',
                 transition:'all .15s',
               }}
-            >{tab}</button>
+            >{tab === 'ONEPAGER' ? 'ONE PAGER' : tab}</button>
           ))}
         </div>
 
         {activeTab === 'COMPARE' && <CompareTab deals={deals} />}
+
+        {activeTab === 'ONEPAGER' && <OnePagerTab deals={deals} />}
 
         {activeTab === 'SUPPORT' && (
           <div className="space-y-3">
@@ -875,18 +1259,26 @@ VITE_ANTHROPIC_API_KEY=sk-ant-...
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
 
                   <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px'}}>
-                    <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:6}}>Current Status</div>
-                    <div style={{fontSize:'13px',fontWeight:700,color:'var(--text)',marginBottom:4}}>Refinement / Validation</div>
-                    <p style={{fontSize:'11px',color:'var(--muted)'}}>Pipeline foundation is working end-to-end. Current focus is UI polish, fast-pass extraction validation, and workflow refinements before broader use.</p>
+                    <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:6}}>Current Phase</div>
+                    <div style={{fontSize:'13px',fontWeight:700,color:'var(--text)',marginBottom:4}}>Phase 3 — Preflight Complete</div>
+                    <p style={{fontSize:'11px',color:'var(--muted)'}}>Repo A source inspection, field map, API contract, and conflict log are done. Awaiting implementation approval before coding begins.</p>
                   </div>
 
                   <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px'}}>
-                    <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:6}}>Active Workstream</div>
+                    <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:6}}>Overall Status</div>
                     <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                      {['UI polish pass — LSG Deal Ingest visual language','Fast-pass OM extraction (browser → Anthropic)','Tab structure: Pipeline · Compare · Support','Collapsible support cards (this view)'].map(item => (
-                        <div key={item} className="flex items-start gap-2">
-                          <div style={{width:5,height:5,borderRadius:'50%',background:'#16a34a',flexShrink:0,marginTop:5}}/>
-                          <span style={{fontSize:'11px',color:'var(--muted)'}}>{item}</span>
+                      {[
+                        ['Phase 1 — Planning & base repo setup','done'],
+                        ['Phase 2 — Supabase integration (Milestone 1)','done'],
+                        ['Phase 3 — Preflight planning','done'],
+                        ['Phase 3 — Implementation','pending'],
+                      ].map(([label,state]) => (
+                        <div key={label} className="flex items-start gap-2">
+                          <div style={{
+                            width:5,height:5,borderRadius:'50%',flexShrink:0,marginTop:5,
+                            background: state==='done' ? '#16a34a' : 'var(--border2)',
+                          }}/>
+                          <span style={{fontSize:'11px',color: state==='done' ? 'var(--muted)' : 'var(--dim)'}}>{label}</span>
                         </div>
                       ))}
                     </div>
@@ -895,17 +1287,13 @@ VITE_ANTHROPIC_API_KEY=sk-ant-...
                 </div>
 
                 <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px'}}>
-                  <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:8}}>What Is Working Now</div>
+                  <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:8}}>Recently Completed</div>
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'4px 16px'}}>
                     {[
-                      'Pipeline table with sort, search, filter',
-                      'Manual CRUD (add, edit, delete)',
-                      'Supabase persistence',
-                      'Fast-pass OM extraction (browser-side)',
-                      'Stage badges and deal metadata',
-                      'Row-click to edit',
-                      'Delete with confirmation',
-                      'PIPELINE / COMPARE / SUPPORT tabs',
+                      'Milestone 1 confirmed — add → Supabase → refresh → edit → delete',
+                      'Repo A source files inspected in full',
+                      'Phase 3 preflight plan produced',
+                      'Field map, API contract, and conflict log completed',
                     ].map(item => (
                       <div key={item} className="flex items-start gap-2">
                         <div style={{width:5,height:5,borderRadius:'50%',background:'#16a34a',flexShrink:0,marginTop:5}}/>
@@ -915,15 +1303,33 @@ VITE_ANTHROPIC_API_KEY=sk-ant-...
                   </div>
                 </div>
 
+                <div style={{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'5px',padding:'10px 12px'}}>
+                  <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'#92400e',marginBottom:8}}>Blockers Before Phase 3 Implementation</div>
+                  <div style={{display:'flex',flexDirection:'column',gap:5}}>
+                    {[
+                      'Vercel plan must be confirmed as Pro (300s) — two-agent flow exceeds the 60s Hobby limit',
+                      'BLOB_READ_WRITE_TOKEN must be set — PDF upload cannot be tested without it',
+                      'User approval of the Phase 3 implementation plan',
+                    ].map((item,i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span style={{fontSize:'10px',fontWeight:700,color:'#b45309',flexShrink:0,marginTop:1,minWidth:10}}>!</span>
+                        <span style={{fontSize:'11px',color:'#78350f'}}>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
                 <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px'}}>
                   <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:8}}>Immediate Next Steps</div>
                   <div style={{display:'flex',flexDirection:'column',gap:5}}>
                     {[
-                      ['Test fast-pass extraction with real OMs — validate field population and missing-field handling'],
-                      ['Add VITE_ANTHROPIC_API_KEY to Vercel environment variables (Production + Preview)'],
-                      ['Validate Supabase persistence round-trip for all field types including raw_data JSONB'],
-                      ['Smoke test the full add-deal → extract → review → save → pipeline flow'],
-                    ].map(([item],i) => (
+                      'Commit current api/ingest-om.js as a preservation checkpoint',
+                      'Replace api/ingest-om.js with the Repo A two-agent flow (Reader + Standardizer)',
+                      'Update vercel.json — set ingest route maxDuration to 120',
+                      'Update fromDbRow in dealMapper.js with additive v2 schema fallbacks',
+                      'Update handleIngest — re-fetch from Supabase and auto-open the ingested deal in the edit modal',
+                      'Run Phase 3 validation checks — analyst-owned fields blank, raw_data populated, source_files written',
+                    ].map((item,i) => (
                       <div key={i} className="flex items-start gap-2">
                         <span style={{fontSize:'9px',fontWeight:700,color:'var(--accent)',flexShrink:0,marginTop:2,minWidth:14}}>{String(i+1).padStart(2,'0')}</span>
                         <span style={{fontSize:'11px',color:'var(--muted)'}}>{item}</span>
@@ -932,26 +1338,8 @@ VITE_ANTHROPIC_API_KEY=sk-ant-...
                   </div>
                 </div>
 
-                <div style={{background:'var(--surface2)',border:'1px solid var(--border)',borderRadius:'5px',padding:'10px 12px'}}>
-                  <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',color:'var(--dim)',marginBottom:8}}>Deferred / Later</div>
-                  <div style={{display:'flex',flexDirection:'column',gap:4}}>
-                    {[
-                      'Full ingest (Stage 2) — server-side PDF → Anthropic via api/ingest-om.js, enriching raw_data beyond fast-pass fields',
-                      'Compare flow — side-by-side deal comparison (tab placeholder exists)',
-                      'Screener — deal screening against hurdle rates (hurdle config shown above)',
-                      'One-pager generation — IC-ready deal summary export',
-                      'Auth / access control — Supabase RLS with team login',
-                    ].map((item,i) => (
-                      <div key={i} className="flex items-start gap-2">
-                        <div style={{width:5,height:5,borderRadius:'50%',background:'var(--border2)',flexShrink:0,marginTop:5}}/>
-                        <span style={{fontSize:'11px',color:'var(--dim)'}}>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
                 <div style={{display:'flex',justifyContent:'flex-end'}}>
-                  <span style={{fontSize:'10px',color:'var(--dim)'}}>Last updated: April 16, 2026</span>
+                  <span style={{fontSize:'10px',color:'var(--dim)'}}>Last updated: April 17, 2026</span>
                 </div>
 
               </div>
@@ -1058,12 +1446,15 @@ VITE_ANTHROPIC_API_KEY=sk-ant-...
                           ? <span style={{fontSize:'9px',fontWeight:700,padding:'2px 6px',borderRadius:3,letterSpacing:'.04em',background:'var(--surface2)',color:'var(--muted)',border:'1px solid var(--border2)'}}>{deal.assetType}</span>
                           : <span style={{color:'var(--dim)'}}>—</span>}
                       </td>
-                      {['sf','acreage','yearBuiltRenovated','parkingCount','occupancy','walt'].map(k=>(
-                        <td key={k} style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>
-                          {deal[k]||<span style={{color:'var(--dim)'}}>—</span>}
-                        </td>
-                      ))}
-                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',fontWeight:500,color:'var(--text)',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{deal.askingPrice||<span style={{color:'var(--dim)'}}>—</span>}</td>
+                      {['sf','acreage','yearBuiltRenovated','parkingCount','occupancy','walt'].map(k=>{
+                        const display = k === 'walt' ? formatWalt(deal.walt) : deal[k];
+                        return (
+                          <td key={k} style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>
+                            {display || <span style={{color:'var(--dim)'}}>—</span>}
+                          </td>
+                        );
+                      })}
+                      <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{formatUSD(deal.askingPrice) || <span style={{color:'var(--dim)'}}>—</span>}</td>
                       <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{deal.noi||<span style={{color:'var(--dim)'}}>—</span>}</td>
                       <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}}>{deal.capRate||<span style={{color:'var(--dim)'}}>—</span>}</td>
                       <td style={{padding:'7px 10px',borderBottom:'1px solid var(--border)',fontSize:'11px',color:'var(--muted)',whiteSpace:'nowrap',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis'}}>{deal.broker||<span style={{color:'var(--dim)'}}>—</span>}</td>

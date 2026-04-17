@@ -144,6 +144,54 @@ See BACKLOG.md for the full deferred list.
 
 ## Log
 
+### 2026-04-17 — End-of-day handoff: meeting-polish UI pass (no Phase 3 code touched)
+
+**Session summary (front-end-only, presentation-oriented work):**
+
+1. **Pipeline table formatting fixes** (`src/App.jsx`)
+   - Added two display-layer helpers: `formatUSD` (renders `$20,000,000` form, returns em-dash for non-numeric values like `"Best Offer"`) and `formatWalt` (regex-extracts first decimal, formats to one decimal place, strips `±` and unit suffixes).
+   - Purchase Price cell now matches surrounding numeric cells visually — removed `fontWeight:500` and `color:'var(--text)'` so it uses the same `color:'var(--muted)'` as NOI / Cap Rate / Bid Date.
+   - WALT renders as `4.8` / `24.4` (no `±`, no `Yrs.`). Sort behavior unchanged — still uses raw strings via `parseSortable`.
+   - No changes to stored values, `dealMapper.js`, Supabase, or any form input.
+
+2. **ONE PAGER tab (mock presentation page)** (`src/App.jsx`)
+   - Added a new `ONEPAGER` tab between COMPARE and SUPPORT.
+   - Layout adapted from `examples/lsg_one_pager_v4.html`: dark `#111` uppercase section-header strip, three-box head row (Property / Transaction / Scorecard), 3-column main grid of section cards, "Confidential & Proprietary — LIGHTSTONE" footer strap.
+   - Typography bumped from the example's print sizes (7.5–9px) to screen-readable 9–11px. Dropped the example's layout editor, drag-drop, API inputs, upload zone, cash-flows table, and all generation mechanics.
+   - Sections populated from real top-level fields only: Property (assetType/sf/acreage/vintage/parking/occupancy+WALT), Transaction (stage/broker/bidDate/sourceFiles), Summary Metrics (all six core fields), Market & Submarket (market only), Sources & Uses (purchase price only), Key Anchors (split from `keyAnchors`), Notes.
+   - Scorecard, Returns Summary, Capital Sources, and most of Sources & Uses are intentional placeholders with an italic "data not yet modeled" note — no fabricated tenant rosters, returns, or debt details.
+   - Deal selection is a local dropdown in the action bar; defaults to the most recent deal (`deals[0]`). Pipeline row-click → edit-modal behavior is unchanged.
+   - Action-bar buttons (Layout / Edit Data / DB Sync / Clear / Print / Export PDF) are rendered `disabled` with "Not yet wired" tooltips — visible but non-functional, per meeting-demo scope.
+   - **This is NOT Phase 4 implementation.** The "One-pager generation" backlog item remains deferred. No `api/generate-memo.js`, no print logic, no PDF export, no Repo A logic ported.
+
+3. **Support tab polish** (`src/App.jsx`)
+   - Flipped `SupportCard`'s `defaultOpen` default from `true` → `false`. All four cards (Screening Hurdles, Supabase Setup Guide, Anthropic API Key, Project Status) now start collapsed on tab entry. Expand/collapse behavior unchanged.
+   - Rewrote the "Project Status & Next Steps" card to reflect current reality: Phase 3 preflight complete, awaiting implementation approval. Replaced stale "Refinement / Validation" / "Fast-pass OM extraction" copy with Current Phase, Overall Status (Phase 1 ✓ / Phase 2 ✓ / Phase 3 preflight ✓ / Phase 3 implementation pending), Recently Completed (4 items), Blockers Before Phase 3 Implementation (the 3 blockers from Current Status above — amber warning styling), and Immediate Next Steps (the 6 open Phase 3 tasks from TASKS.md).
+   - Removed the "What Is Working Now" and "Deferred / Later" blocks — redundant with the phase-status indicators and violated the "don't mention deferred features" instruction.
+
+**What was NOT touched this session:**
+- `api/ingest-om.js`, `api/blob-upload.js` — Phase 3 implementation is still blocked on the three items in Current Status.
+- `src/lib/dealMapper.js`, `src/lib/supabase.js`, `db/schema.sql` — no schema, mapping, or persistence changes.
+- `vercel.json` — `maxDuration` still 60s; Phase 3 requires 120s but that change hasn't been made.
+- TASKS.md, BACKLOG.md, PRD.md, MERGE_PLAN.md — Phase 3 task list, backlog deferrals, and merge plan are intentionally untouched.
+- Locked Decisions — all 8 still in force. Side-by-side comparison and AI screener remain on the Do Not Overbuild list for their real-feature implementations; the UI shells built during this session do not promote either backlog item.
+
+**Pipeline state at handoff:**
+- Branch: `main`, pushed to `origin/main`.
+- Phase 1 complete ✓ | Phase 2 complete ✓ | Phase 3 preflight complete, implementation not started.
+- Milestone 1 (add → Supabase → refresh → edit → delete) confirmed and working in deployed Vercel environment.
+- Three Compare tab / One Pager / Pipeline-formatting UI shells are live for the upcoming demo but do not constitute production feature work.
+
+**Resume next session by:**
+- Resolving the three Phase 3 blockers (Vercel Pro confirmation, `BLOB_READ_WRITE_TOKEN`, user approval of the implementation plan).
+- Then beginning the six Phase 3 tasks in order — starting with the `api/ingest-om.js` preservation commit.
+
+**Files changed this session:**
+- `src/App.jsx` — all edits listed above.
+- `PROJECT_OPERATING_LOG.md` — this entry + Current Status date.
+
+---
+
 ### 2026-04-17 — Compare tab UI shell (meeting demo only — NOT a scope change)
 
 **What happened:**
