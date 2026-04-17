@@ -34,9 +34,10 @@ This project follows the operating discipline from the Hospitality Pricing Copil
 
 ## Current Status
 
-**Date:** 2026-04-16
+**Date:** 2026-04-17
 **Phase:** 3 — Preflight planning complete; awaiting implementation approval
 **Status:** Phase 1 complete ✓ | Phase 2 complete ✓ | Phase 3 preflight complete, not yet started
+**Side note:** 2026-04-17 Compare tab UI shell added for meeting demo only — does not promote the backlog comparison feature (see log entry).
 
 **Completed as of this update:**
 - Phases 1 and 2 fully gated and complete
@@ -142,6 +143,31 @@ See BACKLOG.md for the full deferred list.
 ---
 
 ## Log
+
+### 2026-04-17 — Compare tab UI shell (meeting demo only — NOT a scope change)
+
+**What happened:**
+- Built a presentation-ready Compare tab UI in `src/App.jsx` to replace the "coming soon" placeholder for an upcoming meeting demo
+- Added a `CompareTab` component with: header ("Side-by-Side Comparison" + "Select 2–3 deals to compare"), three deal dropdowns (A / B / C-optional) with cross-slot duplicate prevention, Clear button, empty state, and a 14-row comparison grid (Property Name, Address, Market, Asset Type, SF, Occupancy, WALT, Purchase Price, Going-In Cap Rate, NOI, Broker, Bid Date, Stage, Notes)
+- Follow-up pass: switched the comparison grid to `table-layout: fixed` with an explicit `<colgroup>` — first column fixed at 180px, remaining deal columns each `calc((100% − 180px) / N)` so 2-deal and 3-deal views are always evenly distributed regardless of cell content
+- Reuses existing `StageBadge` for the Stage row; matches existing CSS variables (`--surface`, `--border`, `--accent`, etc.); em-dash for missing values
+
+**What this is NOT:**
+- Not the "Side-by-Side Deal Comparison" backlog item — that remains deferred until post-M4 per BACKLOG.md
+- No backend, persistence, API, schema, export, analytics, or screener logic was introduced
+- Purely a front-end render of existing in-memory `deals` state
+- Compare-tab selection is local component state and resets on tab switch (intentional — no new persistence)
+
+**Governance note:**
+- Locked Decision "Side-by-side deal comparison" in the Do Not Overbuild list remains in force for the real feature
+- This UI shell was explicitly scoped and authorized as a meeting-only presentation pass
+- No changes to TASKS.md, BACKLOG.md, PRD.md, or MERGE_PLAN.md
+- Phase 3 implementation remains blocked on the three items listed in Current Status
+
+**Files changed:**
+- `src/App.jsx` — added `CompareTab` component + `COMPARE_ROWS` / `dealLabel` helpers; replaced the placeholder block under `activeTab === 'COMPARE'`
+
+---
 
 ### 2026-04-16 — Phase 3 preflight: Repo A source inspection and implementation plan
 

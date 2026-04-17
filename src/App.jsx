@@ -436,6 +436,202 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
   );
 }
 
+// ── COMPARE TAB ─────────────────────────────────────────────────────────────
+
+const COMPARE_ROWS = [
+  { label: 'Property Name',     key: 'propertyName'    },
+  { label: 'Address',           key: 'propertyAddress' },
+  { label: 'Market',            key: 'market'          },
+  { label: 'Asset Type',        key: 'assetType'       },
+  { label: 'SF',                key: 'sf'              },
+  { label: 'Occupancy',         key: 'occupancy'       },
+  { label: 'WALT',              key: 'walt'            },
+  { label: 'Purchase Price',    key: 'askingPrice'     },
+  { label: 'Going-In Cap Rate', key: 'capRate'         },
+  { label: 'NOI',               key: 'noi'             },
+  { label: 'Broker',            key: 'broker'          },
+  { label: 'Bid Date',          key: 'bidDate'         },
+  { label: 'Stage',             key: 'stage'           },
+  { label: 'Notes',             key: 'notes'           },
+];
+
+function dealLabel(d) {
+  return d.propertyName || d.propertyAddress || 'Untitled deal';
+}
+
+function CompareTab({ deals }) {
+  const [selA, setSelA] = useState('');
+  const [selB, setSelB] = useState('');
+  const [selC, setSelC] = useState('');
+
+  const selected = [selA, selB, selC]
+    .map(id => deals.find(d => d.id === id))
+    .filter(Boolean);
+
+  const anySelected = Boolean(selA || selB || selC);
+
+  const cardStyle = {
+    background:'var(--surface)',
+    border:'1px solid var(--border)',
+    borderRadius:'8px',
+    boxShadow:'var(--sh)',
+    overflow:'hidden',
+  };
+  const slotLabelStyle = {
+    fontSize:'9px',fontWeight:700,textTransform:'uppercase',
+    letterSpacing:'.08em',color:'var(--muted)',
+  };
+  const selectStyle = {
+    width:'100%',background:'var(--surface2)',
+    border:'1px solid var(--border2)',borderRadius:'5px',
+    padding:'7px 10px',fontSize:'12px',color:'var(--text)',
+    fontFamily:'inherit',outline:'none',cursor:'pointer',
+  };
+  const labelCellStyle = {
+    fontSize:'10px',fontWeight:700,textTransform:'uppercase',
+    letterSpacing:'.06em',color:'var(--muted)',
+    padding:'10px 14px',borderBottom:'1px solid var(--border)',
+    whiteSpace:'nowrap',verticalAlign:'top',width:180,
+    background:'var(--surface)',
+  };
+  const valueCellStyle = {
+    fontSize:'12px',color:'var(--text)',
+    padding:'10px 14px',borderBottom:'1px solid var(--border)',
+    borderLeft:'1px solid var(--border)',verticalAlign:'top',
+    lineHeight:1.5,overflowWrap:'break-word',
+  };
+
+  const em = <span style={{color:'var(--dim)'}}>—</span>;
+  const renderCell = (deal, key) => {
+    const v = deal?.[key];
+    if (v == null || v === '') return em;
+    if (key === 'stage') return <StageBadge stage={v} />;
+    return v;
+  };
+
+  const slot = (value, onChange, exclude, placeholder) => {
+    const options = deals.filter(d => d.id === value || !exclude.includes(d.id));
+    return (
+      <select value={value} onChange={e=>onChange(e.target.value)} style={selectStyle}>
+        <option value="">{placeholder}</option>
+        {options.map(d => (
+          <option key={d.id} value={d.id}>{dealLabel(d)}</option>
+        ))}
+      </select>
+    );
+  };
+
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+
+      {/* Header + selectors */}
+      <div style={cardStyle}>
+        <div style={{
+          display:'flex',alignItems:'center',justifyContent:'space-between',
+          padding:'12px 18px',borderBottom:'1px solid var(--border)',
+          background:'var(--surface2)',
+        }}>
+          <div style={{fontSize:'12px',fontWeight:700,color:'var(--text)',letterSpacing:'.02em'}}>
+            Side-by-Side Comparison
+          </div>
+          <div style={{fontSize:'10px',color:'var(--muted)'}}>
+            Select 2–3 deals to compare
+          </div>
+        </div>
+        <div style={{
+          padding:'14px 18px',display:'flex',gap:12,
+          alignItems:'flex-end',flexWrap:'wrap',
+        }}>
+          <div style={{flex:'1 1 200px',display:'flex',flexDirection:'column',gap:5}}>
+            <div style={slotLabelStyle}>Deal A</div>
+            {slot(selA, setSelA, [selB, selC], 'Select a deal…')}
+          </div>
+          <div style={{flex:'1 1 200px',display:'flex',flexDirection:'column',gap:5}}>
+            <div style={slotLabelStyle}>Deal B</div>
+            {slot(selB, setSelB, [selA, selC], 'Select a deal…')}
+          </div>
+          <div style={{flex:'1 1 200px',display:'flex',flexDirection:'column',gap:5}}>
+            <div style={slotLabelStyle}>
+              Deal C <span style={{textTransform:'none',fontWeight:500,color:'var(--dim)'}}>(optional)</span>
+            </div>
+            {slot(selC, setSelC, [selA, selB], 'Select a deal…')}
+          </div>
+          <button
+            onClick={()=>{setSelA('');setSelB('');setSelC('');}}
+            disabled={!anySelected}
+            style={{
+              padding:'7px 14px',borderRadius:'5px',fontSize:'11px',fontWeight:600,
+              cursor: anySelected ? 'pointer' : 'default',
+              border:'1px solid var(--border2)',background:'var(--surface2)',
+              color:'var(--muted)',opacity: anySelected ? 1 : 0.5,
+              transition:'all .15s',height:32,
+            }}
+          >Clear</button>
+        </div>
+      </div>
+
+      {/* Empty state or comparison grid */}
+      {selected.length < 2 ? (
+        <div style={{...cardStyle,padding:'60px 24px',textAlign:'center'}}>
+          <div style={{fontSize:'32px',marginBottom:10,opacity:.22}}>⇌</div>
+          <div style={{fontSize:'12px',fontWeight:500,color:'var(--muted)',marginBottom:4}}>
+            Select at least two deals to preview a side-by-side comparison.
+          </div>
+          <div style={{fontSize:'11px',color:'var(--dim)'}}>
+            Pick from the dropdowns above.
+          </div>
+        </div>
+      ) : (
+        <div style={{...cardStyle,overflowX:'auto'}}>
+          <table style={{width:'100%',borderCollapse:'collapse',tableLayout:'fixed'}}>
+            <colgroup>
+              <col style={{width:180}} />
+              {selected.map(d => (
+                <col key={d.id} style={{width:`calc((100% - 180px) / ${selected.length})`}} />
+              ))}
+            </colgroup>
+            <thead>
+              <tr>
+                <th style={{...labelCellStyle,background:'var(--surface2)',textAlign:'left'}}>
+                  Field
+                </th>
+                {selected.map((d, i) => (
+                  <th key={d.id} style={{
+                    ...valueCellStyle,background:'var(--surface2)',
+                    textAlign:'left',
+                  }}>
+                    <div style={{
+                      fontSize:'9px',fontWeight:700,textTransform:'uppercase',
+                      letterSpacing:'.08em',color:'var(--muted)',marginBottom:3,
+                    }}>
+                      Deal {['A','B','C'][i]}
+                    </div>
+                    <div style={{fontSize:'12px',fontWeight:700,color:'var(--text)'}}>
+                      {dealLabel(d)}
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {COMPARE_ROWS.map(row => (
+                <tr key={row.key}>
+                  <td style={labelCellStyle}>{row.label}</td>
+                  {selected.map(d => (
+                    <td key={d.id} style={valueCellStyle}>
+                      {renderCell(d, row.key)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -563,13 +759,7 @@ export default function App() {
           ))}
         </div>
 
-        {activeTab === 'COMPARE' && (
-          <div style={{background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',padding:'40px',textAlign:'center',boxShadow:'var(--sh)'}}>
-            <div style={{fontSize:'32px',marginBottom:8,opacity:.25}}>⇌</div>
-            <div style={{fontSize:'12px',fontWeight:500,color:'var(--muted)'}}>Compare view coming soon</div>
-            <div style={{fontSize:'11px',color:'var(--dim)',marginTop:4}}>Side-by-side deal comparison will appear here.</div>
-          </div>
-        )}
+        {activeTab === 'COMPARE' && <CompareTab deals={deals} />}
 
         {activeTab === 'SUPPORT' && (
           <div className="space-y-3">
