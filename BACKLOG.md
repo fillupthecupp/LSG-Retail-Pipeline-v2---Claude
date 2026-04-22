@@ -1,7 +1,7 @@
 # Backlog — Retail Deal Pipeline & Screener
 **Deferred features. None of these are in scope for merged v1.**
 **Promote an item to TASKS.md only after M4 (v1 complete) and with explicit advisor scoping.**
-**Last updated:** 2026-04-16
+**Last updated:** 2026-04-22
 
 ---
 
@@ -90,6 +90,28 @@ Current UI is desktop-first. A responsive redesign for phone/tablet would requir
 - Email or Slack alert as bid date approaches
 - Broker follow-up reminders
 - Stage change notifications
+
+---
+
+## Application Shell / Left Navigation Rail
+
+Evaluate a future shift from the current top-nav-only layout to a left-hand workspace navigation shell (app-shell pattern).
+
+Potential destinations/modules in the rail:
+- Ingest
+- Pipeline
+- Compare
+- One Pager
+- Support
+
+**Rationale:**
+- Stronger workspace feel — the product reads as a tool, not a single-page view
+- Clearer navigation as modules mature and each destination carries more weight
+- Better long-term information architecture once more sections are real (not placeholders)
+
+**Dependency:** Defer until after M4 / merged v1 complete. Only revisit once the core workflow is stable and the active modules are finalized. A navigation overhaul while modules are still in flux would be churn.
+
+**Note:** This should be scoped later as a navigation/app-shell decision, not a casual UI tweak. Promoting it to TASKS.md requires explicit advisor scoping with acceptance criteria (per Promotion Criteria below).
 
 ---
 

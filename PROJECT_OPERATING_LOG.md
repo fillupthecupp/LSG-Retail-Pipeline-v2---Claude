@@ -144,6 +144,33 @@ See BACKLOG.md for the full deferred list.
 
 ## Log
 
+### 2026-04-22 — Advisor review: left navigation rail / app-shell direction (deferred, docs-only)
+
+**What happened:**
+- A left sidebar / workspace navigation rail reference was reviewed as a potential future direction for the app layout (Ingest / Pipeline / Compare / One Pager / Support surfaced as rail destinations)
+- Direction is strategically interesting — stronger workspace feel, clearer IA as modules mature, better long-term navigation once more sections are real
+- Intentionally deferred to avoid an app-shell redesign during current Phase 3 / Phase 4 work. A navigation overhaul while modules are still in flux would be churn
+
+**Current decision:**
+- Preserve existing top-nav layout for now — no app-shell or sidebar work in Phase 3 or Phase 4
+- This is a governance decision, not a UI tweak — scoping belongs to the advisor, not an implementation session
+
+**Future action:**
+- Revisit after M4 (merged v1 complete) once the active modules are finalized
+- If promoted, move the item from BACKLOG.md into TASKS.md with explicit scope and acceptance criteria, per the BACKLOG.md Promotion Criteria
+
+**Governance note:**
+- No code, no layout, no UI changes made in this session
+- Docs-only update: new "Application Shell / Left Navigation Rail" entry added to BACKLOG.md; this log entry recording the advisor decision
+- TASKS.md intentionally not touched — nothing is being promoted yet
+- Phase definitions, milestones, blockers, and Locked Decisions unchanged
+
+**Files changed:**
+- `BACKLOG.md` — added "Application Shell / Left Navigation Rail" deferred item; bumped "Last updated" to 2026-04-22
+- `PROJECT_OPERATING_LOG.md` — this entry
+
+---
+
 ### 2026-04-17 — End-of-day handoff: meeting-polish UI pass (no Phase 3 code touched)
 
 **Session summary (front-end-only, presentation-oriented work):**
