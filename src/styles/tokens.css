@@ -1,0 +1,76 @@
+/* LSG Design Tokens — Tier 1
+ * Source of truth: examples/DESIGN_TOKENS.md
+ * Single-accent (red) system, warm grayscale surfaces.
+ * Compatibility aliases at the bottom preserve existing App.jsx consumers
+ * (--accent, --text, --muted, --surface, --border). Do not refactor consumers
+ * in this file's scope — that is Tier 2+ work.
+ */
+
+:root {
+  /* Accent — the only colored ramp */
+  --lsg-red:           #B8232A;
+  --lsg-red-deep:      #8F1A20;
+  --lsg-red-subtle:    #FBEDEE;
+
+  /* Surfaces */
+  --lsg-canvas:        #FAFAF8;
+  --lsg-surface:       #FFFFFF;
+  --lsg-surface-alt:   #F6F6F3;
+  --lsg-surface-sunk:  #EEEEE9;
+
+  /* Text */
+  --lsg-text-primary:  #171717;
+  --lsg-text-secondary:#3D3D3D;
+  --lsg-text-tertiary: #8A8A85;
+  --lsg-text-disabled: #B8B8B0;
+
+  /* Borders */
+  --lsg-border:        rgba(0,0,0,0.06);
+  --lsg-border-strong: rgba(0,0,0,0.12);
+
+  /* Semantic — state only, never decoration */
+  --lsg-positive:        #116B40;
+  --lsg-positive-subtle: #E8F1EC;
+  --lsg-warning:         #8A5A10;
+  --lsg-warning-subtle:  #F6EEDC;
+
+  /* Typography */
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Compatibility aliases — preserve existing variable usage */
+  --accent:    var(--lsg-red);
+  --text:      var(--lsg-text-primary);
+  --muted:     var(--lsg-text-tertiary);
+  --surface:   var(--lsg-surface);
+  --border:    var(--lsg-border);
+}
+
+/* Wordmark lockup — LIGHTSTONE / PIPELINE */
+.wordmark {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--font-sans);
+}
+.wordmark-primary {
+  font-weight: 700;
+  font-size: 16px;
+  color: var(--lsg-red);
+  letter-spacing: 0.12em;
+}
+.wordmark-secondary {
+  font-weight: 400;
+  font-size: 16px;
+  color: var(--lsg-text-tertiary);
+  letter-spacing: 0.06em;
+}
+
+/* Numeric cells: any element already declaring tabular-nums gets Geist Mono.
+ * Matches inline styles written as `fontVariantNumeric: 'tabular-nums'`
+ * (React emits that as style="font-variant-numeric: tabular-nums"), so no
+ * component markup changes are required for Tier 1.
+ */
+[style*="tabular-nums"] {
+  font-family: var(--font-mono);
+}

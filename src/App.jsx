@@ -446,7 +446,7 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
             onMouseLeave={e=>e.currentTarget.style.background='var(--surface)'}
           >Cancel</button>
           <button onClick={()=>onSave(form)} className="inline-flex items-center gap-[5px]" style={{padding:'7px 13px',borderRadius:'5px',fontSize:'12px',fontWeight:500,background:'var(--accent)',color:'#fff',border:'none',cursor:'pointer',transition:'all .15s'}}
-            onMouseEnter={e=>e.currentTarget.style.background='#2d2b28'}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--lsg-red-deep)'}
             onMouseLeave={e=>e.currentTarget.style.background='var(--accent)'}
           >
             <Save style={{width:13,height:13}}/> Save Deal
@@ -1100,18 +1100,15 @@ export default function App() {
       {/* Header */}
       <header style={{background:'var(--surface)',borderBottom:'1px solid var(--border)',position:'sticky',top:0,zIndex:40,boxShadow:'var(--sh)'}}>
         <div className="mx-auto flex max-w-screen-2xl items-center justify-between gap-4" style={{padding:'0 24px',height:'54px'}}>
-          <div className="flex items-center gap-[10px]">
-            <div style={{width:30,height:30,background:'var(--accent)',borderRadius:6,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,fontWeight:700,color:'#fff',flexShrink:0}}>L</div>
-            <div>
-              <div style={{fontSize:'15px',fontWeight:600}}>Lightstone</div>
-              <div style={{fontSize:'10px',color:'var(--dim)',marginTop:1}}>Retail Pipeline · Acquisitions</div>
-            </div>
+          <div className="wordmark">
+            <span className="wordmark-primary">LIGHTSTONE</span>
+            <span className="wordmark-secondary">/ PIPELINE</span>
           </div>
           <button
             onClick={()=>setShowAdd(true)}
             className="inline-flex items-center gap-[5px]"
             style={{padding:'7px 13px',borderRadius:'5px',fontSize:'12px',fontWeight:500,background:'var(--accent)',color:'#fff',border:'none',cursor:'pointer',transition:'all .15s'}}
-            onMouseEnter={e=>e.currentTarget.style.background='#2d2b28'}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--lsg-red-deep)'}
             onMouseLeave={e=>e.currentTarget.style.background='var(--accent)'}
           >
             <Plus style={{width:13,height:13}}/> Add Deal
@@ -1466,8 +1463,8 @@ VITE_ANTHROPIC_API_KEY=sk-ant-...
                         <button
                           onClick={e=>{e.stopPropagation();setDeleteId(deal.id);}}
                           className="inline-flex items-center"
-                          style={{padding:'3px 8px',borderRadius:4,fontSize:'10px',fontWeight:600,cursor:'pointer',border:'1px solid #fecaca',background:'transparent',color:'#dc2626',transition:'all .15s'}}
-                          onMouseEnter={e=>e.currentTarget.style.background='#fef2f2'}
+                          style={{padding:'3px 8px',borderRadius:4,fontSize:'10px',fontWeight:600,cursor:'pointer',border:'1px solid var(--lsg-red-subtle)',background:'transparent',color:'var(--lsg-red)',transition:'all .15s'}}
+                          onMouseEnter={e=>e.currentTarget.style.background='var(--lsg-red-subtle)'}
                           onMouseLeave={e=>e.currentTarget.style.background='transparent'}
                         >
                           <Trash2 style={{width:10,height:10}}/>
@@ -1518,9 +1515,9 @@ VITE_ANTHROPIC_API_KEY=sk-ant-...
               >Cancel</button>
               <button
                 onClick={()=>deleteDeal(deleteId)}
-                style={{flex:1,padding:'7px 13px',borderRadius:'5px',fontSize:'12px',fontWeight:500,background:'#dc2626',color:'#fff',border:'none',cursor:'pointer'}}
-                onMouseEnter={e=>e.currentTarget.style.background='#b91c1c'}
-                onMouseLeave={e=>e.currentTarget.style.background='#dc2626'}
+                style={{flex:1,padding:'7px 13px',borderRadius:'5px',fontSize:'12px',fontWeight:500,background:'var(--lsg-red)',color:'#fff',border:'none',cursor:'pointer'}}
+                onMouseEnter={e=>e.currentTarget.style.background='var(--lsg-red-deep)'}
+                onMouseLeave={e=>e.currentTarget.style.background='var(--lsg-red)'}
               >Delete</button>
             </div>
           </div>

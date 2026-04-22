@@ -144,6 +144,45 @@ See BACKLOG.md for the full deferred list.
 
 ## Log
 
+### 2026-04-22 — Tier 1 aesthetic port: LSG design tokens, Geist fonts, wordmark, accent consistency
+
+**What happened:**
+- Ported the Tier 1 visual foundation from `examples/DESIGN_TOKENS.md` into the code project. Single-accent red system, warm grayscale, Geist typography. No Tier 2 or Tier 3 work.
+- Follow-up pass (Tier 1.1) cleaned up remaining hardcoded hover/destructive colors so the new red accent doesn't clash on interaction.
+
+**Changes made:**
+- Added `src/styles/tokens.css` — the Tier 1 token file: `--lsg-red` ramp, warm surfaces (`--lsg-canvas` `#FAFAF8`, `--lsg-surface`, `--lsg-surface-alt`, `--lsg-surface-sunk`), text scale, borders, semantic positive/warning, Geist `--font-sans` / `--font-mono`, and compatibility aliases `--accent` `--text` `--muted` `--surface` `--border` so existing `App.jsx` consumers pick up the new palette without a refactor. Wordmark CSS (`.wordmark`, `.wordmark-primary`, `.wordmark-secondary`) lives in the same file.
+- `src/main.jsx` — imports `tokens.css` after `style.css` so the compatibility aliases win the cascade.
+- `index.html` — replaced DM Sans `<link>` with Google Fonts preconnect + `Geist` (300/400/500/700) + `Geist Mono` (400/500).
+- `src/style.css` — body now uses `var(--lsg-canvas)` / `var(--lsg-text-primary)` / `var(--font-sans)` with fallbacks; legacy `--bg` updated to `#FAFAF8`; non-aliased vars (`--surface2` `--surface3` `--border2` `--dim` `--sh` `--sh-lg`) preserved for existing consumers.
+- `src/App.jsx` header — replaced the "L" square + "Lightstone / Retail Pipeline · Acquisitions" block with the `LIGHTSTONE / PIPELINE` wordmark (red primary, tertiary-gray secondary).
+- Accent consistency fixes (Tier 1.1): Add Deal and Save Deal primary-button hovers swapped from `#2d2b28` (old near-black) to `var(--lsg-red-deep)`; per-row delete icon border/text and delete-confirmation modal CTA moved off hardcoded Tailwind reds (`#dc2626` / `#fecaca` / `#fef2f2` / `#b91c1c`) to `var(--lsg-red)` / `var(--lsg-red-deep)` / `var(--lsg-red-subtle)`.
+
+**What was explicitly NOT touched:**
+- No feature work, no new views, no Tier 2 components (KPI strip, section-header signature, row treatment, status pill map, priority badges), no Tier 3 polish (sidebar restructure, filter chips, soft placeholders, maturity indicators).
+- No schema changes (`db/schema.sql` untouched), no API changes (`api/ingest-om.js`, `api/blob-upload.js` untouched), no Supabase changes, no mapper changes (`src/lib/dealMapper.js` untouched).
+- No Phase 3 ingestion logic touched. Phase 3 blockers (Vercel Pro, `BLOB_READ_WRITE_TOKEN`, implementation-plan approval) are unchanged and remain the gating items.
+- Locked Decisions, milestones, phase definitions, and the Do Not Overbuild list are all unchanged.
+
+**Known bridge to be removed in Tier 2:**
+- `tokens.css` contains a temporary rule `[style*="tabular-nums"] { font-family: var(--font-mono); }`. This was used to promote existing numeric table cells to Geist Mono without a component-markup refactor. It is fragile (string-matches inline-style serialization) and should be replaced in Tier 2 with explicit `.numeric` / `data-numeric` classes on KPI, table-numeric, and maturity-proximity cells — applied at the same time as the Tier 2 row treatment work. Do not build new features on top of the attribute selector.
+
+**Acceptance check:**
+- App renders identically in functionality. Header shows the new wordmark. Body background is warm `#FAFAF8`. Geist + Geist Mono load via Google Fonts. Vite HMR reports no errors across all edits. No existing `--accent` / `--text` / `--muted` / `--surface` / `--border` consumer breaks.
+
+**Files changed:**
+- `src/styles/tokens.css` (new)
+- `src/main.jsx`
+- `index.html`
+- `src/style.css`
+- `src/App.jsx` (header wordmark + primary-button hover fixes + delete-button token migration)
+- `PROJECT_OPERATING_LOG.md` — this entry
+
+**Next action:**
+- Return focus to the main roadmap — Phase 3 ingestion implementation. The three Phase 3 blockers in Current Status still gate start. Aesthetic work stops here until the Tier 2 task is explicitly scoped, post-Phase-3.
+
+---
+
 ### 2026-04-22 — Advisor review: left navigation rail / app-shell direction (deferred, docs-only)
 
 **What happened:**

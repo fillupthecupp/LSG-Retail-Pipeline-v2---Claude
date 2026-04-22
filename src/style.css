@@ -3,7 +3,10 @@
 @tailwind utilities;
 
 :root {
-  --bg: #f7f6f4;
+  /* Legacy vars not covered by tokens.css compatibility aliases.
+   * tokens.css overrides --surface, --border, --text, --muted, --accent
+   * (it is imported after this file in src/main.jsx). */
+  --bg: #FAFAF8;
   --surface: #fff;
   --surface2: #f4f3f1;
   --surface3: #eeedea;
@@ -18,9 +21,9 @@
 }
 
 body {
-  font-family: 'DM Sans', sans-serif;
-  background: var(--bg);
-  color: var(--text);
+  font-family: var(--font-sans, 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif);
+  background: var(--lsg-canvas, #FAFAF8);
+  color: var(--lsg-text-primary, #171717);
   font-size: 13px;
 }
 
