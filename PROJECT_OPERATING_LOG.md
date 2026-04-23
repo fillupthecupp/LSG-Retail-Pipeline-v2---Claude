@@ -35,10 +35,11 @@ This project follows the operating discipline from the Hospitality Pricing Copil
 ## Current Status
 
 **Date:** 2026-04-23
-**Phase:** 3 — Preflight planning complete; awaiting implementation approval
-**Status:** Phase 1 complete ✓ | Phase 2 complete ✓ | Phase 3 preflight complete, not yet started
+**Phase:** 3 — Preflight complete; implementation beginning now
+**Status:** Phase 1 complete ✓ | Phase 2 complete ✓ | Phase 3 preflight complete ✓ | Phase 3 implementation not yet complete
 **Side note:** 2026-04-17 Compare tab UI shell added for meeting demo only — does not promote the backlog comparison feature (see log entry).
 **Side note:** 2026-04-23 Pipeline KPI strip upgraded to Tier 2 §2.1 visual spec (presentation-safe slice); pass_reason capture formally deferred to BACKLOG.md (see log entry).
+**Side note:** 2026-04-23 Vercel Pro confirmed; UI/demo polish is no longer the active stream — focus returns to Phase 3 ingestion implementation. Target: live draft deployment next week for internal testing (see log entry).
 
 **Completed as of this update:**
 - Phases 1 and 2 fully gated and complete
@@ -47,11 +48,11 @@ This project follows the operating discipline from the Hospitality Pricing Copil
 - All 5 MERGE_PLAN.md open questions answered — logged below
 - Phase 3 preflight plan produced — field map, API contract, conflict log, implementation order
 - 5 Repo A vs. locked-decision conflicts identified and resolved (C1–C5, logged below)
+- Vercel Pro confirmed (2026-04-23) — 120s `maxDuration` ceiling is available for the ingest route
 
-**Blockers before Phase 3 implementation begins:**
-- Vercel plan must be confirmed as Pro (300s) — two-agent flow exceeds 60s Hobby limit
-- BLOB_READ_WRITE_TOKEN must be set — PDF upload cannot be tested without it
-- User must approve Phase 3 implementation plan
+**Remaining blockers before end-to-end Phase 3 validation:**
+- `BLOB_READ_WRITE_TOKEN` must be set in `.env.local` and in the Vercel dashboard — PDF upload cannot be tested end-to-end without it
+- User approval / start of Phase 3 implementation
 
 ---
 
@@ -144,6 +145,33 @@ See BACKLOG.md for the full deferred list.
 ---
 
 ## Log
+
+### 2026-04-23 — Vercel Pro confirmed; focus returns to Phase 3 ingestion (end of meeting-polish stream)
+
+**What happened:**
+- Vercel Pro plan confirmed. The "Vercel plan must be confirmed as Pro (300s)" blocker is closed. The 120s `maxDuration` ceiling required for the two-agent ingest route is now available.
+- End of the meeting-polish / presentation stream. The aesthetic tokens, KPI strip, Compare / ONE PAGER / Support UI passes are sufficient for the near-term demo cadence and are not being extended further in this session.
+- Project focus returns to Phase 3 ingestion implementation — porting Repo A's two-agent extraction into `api/ingest-om.js`, wiring the Supabase write, and closing the first-round end-to-end path.
+- Target: a live draft deployment next week for internal testing. Bar for that deploy is defined in this session's execution-readiness summary (not a new milestone, not a new phase gate — it is a checkpoint inside Phase 3).
+
+**Current Status reflects this:**
+- "Vercel plan must be confirmed as Pro" removed from blockers.
+- Remaining blockers before end-to-end Phase 3 validation: `BLOB_READ_WRITE_TOKEN` set in `.env.local` + Vercel dashboard; user approval / start of Phase 3 implementation.
+- Phase definitions, milestones (M0–M4), locked decisions, and the BACKLOG promotion criteria are unchanged.
+
+**Scope discipline for the next stretch:**
+- No new features, no sidebar / app-shell work, no real Compare feature, no export / reporting, no `pass_reason` implementation, no Phase 4 (one-pager generation) work.
+- No schema change in this pass. `db/schema.sql` stays as-is; Phase 3 implementation is additive on top of the existing schema plus `raw_data` JSONB.
+- Aesthetic Tier 2 / Tier 3 work remains deferred — only the single KPI-strip carve-out already shipped was authorized.
+
+**Files changed this session:**
+- `PROJECT_OPERATING_LOG.md` — this entry + Current Status block (date, blocker list, side note).
+
+**Next action:**
+- Resolve `BLOB_READ_WRITE_TOKEN` (set in `.env.local` and Vercel env vars).
+- On user approval, execute the Phase 3 TASKS.md checklist in the order documented in this session's execution checklist, beginning with the preservation commit of the current single-agent `api/ingest-om.js`.
+
+---
 
 ### 2026-04-23 — ONE PAGER token refresh + Pipeline KPI strip upgrade + deferred pass_reason enhancement
 
