@@ -94,6 +94,31 @@ function buildRawData(form) {
  */
 export function fromDbRow(row) {
   const raw = row.raw_data || {};
+
+  // ── Phase 3 v2 fallbacks ────────────────────────────────────────────────
+  // Additive only. v1 priority (raw.<camelCase> from buildRawData after analyst
+  // edit) wins first; Agent 2 v2 paths fall through after. See Phase 3 field
+  // map in PROJECT_OPERATING_LOG.md (2026-04-16 entry). purchase_price and
+  // going_in_cap remain analyst-owned — v2 never contributes to those fields.
+
+  // raw.market may be a string (v1 buildRawData) or an object (v2 Agent 2).
+  const v2Market = (raw.market && typeof raw.market === 'object')
+    ? (raw.market.submarket || '')
+    : '';
+  const v2MarketStringOrNull = (raw.market && typeof raw.market === 'string')
+    ? raw.market
+    : '';
+
+  // NOI in v2 is an array on cash_flows; take first non-empty entry.
+  const v2Noi = Array.isArray(raw.cash_flows?.noi)
+    ? (raw.cash_flows.noi.find(v => v != null && v !== '') || '')
+    : '';
+
+  // keyAnchors derived from top_tenants[0..2].name
+  const v2Anchors = Array.isArray(raw.top_tenants)
+    ? raw.top_tenants.slice(0, 3).map(t => t && t.name).filter(Boolean).join(', ')
+    : '';
+
   return {
     // System fields
     id:          row.id,
@@ -112,29 +137,30 @@ export function fromDbRow(row) {
     sourceFiles: row.source_files || null,
 
     // Scalar-backed fields — prefer raw_data string for display fidelity
-    propertyName:    raw.propertyName    || row.deal_name      || '',
-    propertyAddress: raw.propertyAddress || row.address        || '',
-    assetType:       raw.assetType       || row.asset_type     || '',
-    // askingPrice / capRate: analyst-entered; raw_data string takes priority over NUMERIC scalar
+    propertyName:    raw.propertyName    || raw.deal_name      || row.deal_name      || '',
+    propertyAddress: raw.propertyAddress || raw.address        || row.address        || '',
+    assetType:       raw.assetType       || raw.property?.type || row.asset_type     || '',
+    // askingPrice / capRate: analyst-entered; raw_data string takes priority over NUMERIC scalar.
+    // No v2 fallback — these fields are deliberately null after ingest (locked C1/C2).
     askingPrice:     raw.askingPrice     ||
       (row.purchase_price != null ? String(row.purchase_price) : ''),
     capRate:         raw.capRate         ||
       (row.going_in_cap != null ? String(row.going_in_cap) : ''),
-    broker:          raw.broker          || row.source_broker  || '',
+    broker:          raw.broker          || raw.transaction?.sourcing || row.source_broker  || '',
     stage:           row.status          || 'Screening',
 
-    // raw_data-only fields (no scalar column)
-    market:             raw.market             || '',
-    sf:                 raw.sf                 || '',
-    acreage:            raw.acreage            || '',
-    yearBuiltRenovated: raw.yearBuiltRenovated || '',
-    parkingCount:       raw.parkingCount       || '',
-    occupancy:          raw.occupancy          || '',
-    walt:               raw.walt               || '',
-    noi:                raw.noi                || '',
-    keyAnchors:         raw.keyAnchors         || '',
-    bidDate:            raw.bidDate            || '',
-    notes:              raw.notes              || '',
+    // raw_data-only fields (no scalar column) — v1 string first, v2 Agent 2 fallback second.
+    market:             v2MarketStringOrNull || v2Market || '',
+    sf:                 raw.sf                 || raw.property?.size_sf      || '',
+    acreage:            raw.acreage            || raw.property?.acreage      || '',
+    yearBuiltRenovated: raw.yearBuiltRenovated || raw.property?.vintage      || '',
+    parkingCount:       raw.parkingCount       || raw.property?.parking_ratio|| '',
+    occupancy:          raw.occupancy          || raw.property?.occupancy    || '',
+    walt:               raw.walt               || raw.property?.walt         || '',
+    noi:                raw.noi                || v2Noi                      || '',
+    keyAnchors:         raw.keyAnchors         || v2Anchors                  || '',
+    bidDate:            raw.bidDate            || raw.transaction?.bid_deadline || raw.transaction?.call_for_offers || '',
+    notes:              raw.notes              || raw.investment_thesis?.broker_headline || '',
 
     // Phase 3+ fields: irr_levered_5, moic_5, assignee
     // Not surfaced here — no UI form fields or table columns yet.

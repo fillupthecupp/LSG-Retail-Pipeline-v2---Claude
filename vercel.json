@@ -1,7 +1,7 @@
 {
   "functions": {
     "api/ingest-om.js": {
-      "maxDuration": 60
+      "maxDuration": 120
     },
     "api/blob-upload.js": {
       "maxDuration": 30

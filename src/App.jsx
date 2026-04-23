@@ -4,6 +4,7 @@ import {
   Trash2, ChevronDown, AlertCircle, CheckCircle2,
   Save,
 } from 'lucide-react';
+import { upload as blobUpload } from '@vercel/blob/client';
 import { supabase } from './lib/supabase';
 import { fromDbRow, toDbRow } from './lib/dealMapper';
 
@@ -215,46 +216,7 @@ function FF({ label, value, onChange, placeholder, type='text', multiline=false,
   );
 }
 
-const FAST_PASS_PROMPT = `You are a senior commercial real estate acquisitions analyst at Lightstone Group.
-
-Read the uploaded offering memorandum PDF and perform a fast pipeline extract — only the fields listed below.
-
-Rules:
-- Return ONLY valid JSON — no markdown, no commentary, no code fences
-- Return an empty string "" for any field not clearly stated in the document
-- Do not guess or infer values not explicitly in the document
-- For numbers, return them as strings with their original formatting (e.g. "8.5%", "480,588 SF", "$4,200,000")
-- market: city and state only, e.g. "Phoenix, AZ"
-- highlights: extract exactly 2–3 short factual bullet points from the OM's investment highlights or executive summary; each string should be one concise sentence; return [] if none found
-- missingFields: list the keys of any fields you could not find
-- Do NOT extract asking price or cap rate — those are analyst-entered fields
-
-Return exactly this JSON shape:
-{
-  "propertyName": "",
-  "propertyAddress": "",
-  "market": "",
-  "assetType": "",
-  "sf": "",
-  "occupancy": "",
-  "noi": "",
-  "walt": "",
-  "broker": "",
-  "keyAnchors": "",
-  "highlights": [],
-  "missingFields": []
-}`;
-
-function safeParseJson(text) {
-  try { return JSON.parse(text); }
-  catch {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('Model did not return valid JSON.');
-    return JSON.parse(match[0]);
-  }
-}
-
-function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false }) {
+function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false, onIngested }) {
   const [form, setForm] = useState({...EMPTY_FORM, ...initial});
   const [omFile, setOmFile] = useState(null);
   const [ingesting, setIngesting] = useState(false);
@@ -265,75 +227,53 @@ function DealForm({ initial, title, subtitle, onSave, onClose, showIngest=false 
 
   const set = (k,v) => setForm(p=>({...p,[k]:v}));
 
+  // Phase 3 two-agent ingest flow:
+  //   1. Stage the PDF in Vercel Blob via /api/blob-upload (client helper).
+  //   2. POST { filename, url } to /api/ingest-om; the route runs Reader +
+  //      Standardizer, sanitizes output, and INSERTS the deal into Supabase.
+  //   3. Parent (App) receives the new dealId via onIngested, re-fetches the
+  //      row, and auto-opens it in the edit modal per the preflight locked rule.
+  //
+  // Extracted field values are never trusted directly from the API response —
+  // the canonical record comes from Supabase after the insert.
   async function handleIngest() {
     if (!omFile) return;
     setIngesting(true); setIngestError(''); setIngestDone(false); setMissing([]);
     try {
-      const pdfBase64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result.split(',')[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(omFile);
+      // 1. Stage the PDF — @vercel/blob/client hits /api/blob-upload for a token,
+      // then streams the file directly to Blob storage and returns the URL.
+      const blob = await blobUpload(omFile.name, omFile, {
+        access: 'public',
+        handleUploadUrl: '/api/blob-upload',
       });
 
-      const apiKey = import.meta.env.VITE_ANTHROPIC_API_KEY;
-      if (!apiKey) throw new Error('VITE_ANTHROPIC_API_KEY is not configured. Add it to Vercel environment variables.');
-
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      // 2. Trigger the two-agent ingest + Supabase write.
+      const resp = await fetch('/api/ingest-om', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-          'anthropic-version': '2023-06-01',
-          'anthropic-beta': 'pdfs-2024-09-25',
-          'anthropic-dangerous-direct-browser-access': 'true',
-        },
-        body: JSON.stringify({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1024,
-          system: FAST_PASS_PROMPT,
-          messages: [{
-            role: 'user',
-            content: [
-              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
-              { type: 'text', text: `Extract the fast-pass fields from this OM. Filename: ${omFile.name}` },
-            ],
-          }],
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename: omFile.name, url: blob.url }),
       });
+      let data = null;
+      try { data = await resp.json(); } catch { /* fall through */ }
 
-      if (!resp.ok) {
-        const errData = await resp.json().catch(() => ({}));
-        throw new Error(errData?.error?.message || `Anthropic API error (${resp.status})`);
+      if (!resp.ok || !data || data.ok !== true) {
+        const stage = data?.stage ? `[${data.stage}] ` : '';
+        const msg = data?.error || `Ingest failed (HTTP ${resp.status}).`;
+        throw new Error(stage + msg);
       }
 
-      const data = await resp.json();
-      const rawText = data.content?.find(b => b.type === 'text')?.text || '';
-      if (!rawText) throw new Error('Anthropic returned an empty response.');
-
-      const ex = safeParseJson(rawText);
-      const highlights = Array.isArray(ex.highlights) ? ex.highlights : [];
-      setForm(p => ({
-        ...p,
-        propertyName:    ex.propertyName    || p.propertyName,
-        propertyAddress: ex.propertyAddress || p.propertyAddress,
-        market:          ex.market          || p.market,
-        assetType:       ex.assetType       || p.assetType,
-        sf:              ex.sf              || p.sf,
-        occupancy:       ex.occupancy       || p.occupancy,
-        noi:             ex.noi             || p.noi,
-        walt:            ex.walt            || p.walt,
-        broker:          ex.broker          || p.broker,
-        keyAnchors:      ex.keyAnchors      || p.keyAnchors,
-        notes: highlights.length > 0 ? highlights.map(h => `• ${h}`).join('\n') : p.notes,
-        stage: 'Screening',
-        sourceFiles: [...(p.sourceFiles || []), omFile.name],
-        raw_data: { ...(p.raw_data || {}), highlights, ingest_stage: 'fast' },
-      }));
-      setMissing(Array.isArray(ex.missingFields) ? ex.missingFields : []);
+      // 3. Hand the dealId off to the parent so it can re-fetch and auto-open.
       setIngestDone(true);
-    } catch(err) { setIngestError(err?.message || 'Failed to ingest.'); }
-    finally { setIngesting(false); }
+      onIngested?.(data.dealId, {
+        fieldsPopulated: data.fieldsPopulated ?? null,
+        conflicts: data.conflicts ?? 0,
+        confidence: data.confidence ?? null,
+      });
+    } catch (err) {
+      setIngestError(err?.message || 'Failed to ingest.');
+    } finally {
+      setIngesting(false);
+    }
   }
 
   return (
@@ -1223,6 +1163,27 @@ export default function App() {
     if (error) console.error('Failed to delete deal:', error);
   }
 
+  // Phase 3 post-ingest handoff: the server inserted the deal and returned its
+  // id. Re-fetch the canonical row (do not trust the API's extracted payload),
+  // insert it at the top of the pipeline, close the Add-Deal modal, and
+  // auto-open the new deal in the edit modal with analyst-owned fields blank.
+  async function handleIngested(dealId) {
+    if (!dealId) return;
+    const { data, error } = await supabase
+      .from('deals')
+      .select('*')
+      .eq('id', dealId)
+      .single();
+    if (error || !data) {
+      console.error('Failed to re-fetch ingested deal:', error);
+      return;
+    }
+    const deal = fromDbRow(data);
+    setDeals(prev => [deal, ...prev.filter(d => d.id !== dealId)]);
+    setShowAdd(false);
+    setEditDeal(deal);
+  }
+
   return (
     <div style={{minHeight:'100vh',background:'var(--bg)',color:'var(--text)'}}>
 
@@ -1657,6 +1618,7 @@ VITE_ANTHROPIC_API_KEY=sk-ant-...
           showIngest
           onSave={addDeal}
           onClose={()=>setShowAdd(false)}
+          onIngested={handleIngested}
         />
       )}
 
