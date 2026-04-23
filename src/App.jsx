@@ -150,13 +150,54 @@ function HurdlesFields() {
 
 // ────────────────────────────────────────────────────────────────────────────
 
-function StatCard({ label, value }) {
+// KPI tile — Tier 2 strip pattern from examples/DESIGN_TOKENS.md §2.1.
+// White surface, hairline border, red bullet + thin uppercase label,
+// mono-tabular numeric, small delta subline. `subTone`: 'neutral' (default) |
+// 'positive' (green) | 'negative' (red-deep). Red is restricted to the bullet
+// marker and negative-delta text so the strip stays inside the single-accent
+// discipline defined in DESIGN_TOKENS.md.
+function KpiTile({ label, value, subline, subTone = 'neutral' }) {
+  const subColor =
+    subTone === 'positive' ? 'var(--lsg-positive)'
+    : subTone === 'negative' ? 'var(--lsg-red-deep)'
+    : 'var(--lsg-text-tertiary)';
   return (
-    <div className="rounded-[8px] border border-[#e5e3df] bg-[#f4f3f1] px-3 py-[10px]" style={{boxShadow:'var(--sh)'}}>
-      <div className="text-[9px] font-bold uppercase tracking-[.08em] text-[#a8a5a1]">{label}</div>
-      <div className="mt-[3px] text-[18px] font-bold text-[#1a1917]">{value}</div>
+    <div style={{
+      background:'var(--lsg-surface)',
+      border:'1px solid var(--lsg-border)',
+      borderRadius:'4px',
+      padding:'14px 16px',
+      boxShadow:'var(--sh)',
+      display:'flex',flexDirection:'column',gap:3,minHeight:92,
+    }}>
+      <div style={{display:'flex',alignItems:'center',gap:7}}>
+        <span style={{
+          width:5,height:5,borderRadius:'50%',
+          background:'var(--lsg-red)',flexShrink:0,
+        }}/>
+        <span style={{
+          fontSize:'10px',fontWeight:500,textTransform:'uppercase',
+          letterSpacing:'.08em',color:'var(--lsg-text-tertiary)',
+        }}>{label}</span>
+      </div>
+      <div style={{
+        fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',
+        fontSize:'28px',fontWeight:500,color:'var(--lsg-text-primary)',
+        lineHeight:1.05,marginTop:4,
+      }}>{value}</div>
+      <div style={{fontSize:'11px',color:subColor,marginTop:2}}>{subline}</div>
     </div>
   );
+}
+
+// Compact USD for KPI tile values: $1.65b / $42.0m / $240k / $240.
+function formatCompactUSD(n) {
+  if (!Number.isFinite(n)) return '—';
+  const abs = Math.abs(n);
+  if (abs >= 1e9) return '$' + (n / 1e9).toFixed(2).replace(/\.?0+$/, '') + 'b';
+  if (abs >= 1e6) return '$' + (n / 1e6).toFixed(1).replace(/\.0$/, '') + 'm';
+  if (abs >= 1e3) return '$' + Math.round(n / 1e3) + 'k';
+  return '$' + Math.round(n);
 }
 
 // Shared input/select class
@@ -480,14 +521,21 @@ function OnePagerTab({ deals }) {
   if (!deals.length) {
     return (
       <div style={{
-        background:'var(--surface)',border:'1px solid var(--border)',borderRadius:'8px',
-        boxShadow:'var(--sh)',padding:'60px 24px',textAlign:'center',
+        background:'var(--lsg-surface)',
+        border:'1px solid var(--lsg-border-strong)',borderRadius:'8px',
+        boxShadow:'var(--sh)',padding:'64px 24px',textAlign:'center',
       }}>
-        <div style={{fontSize:'32px',marginBottom:10,opacity:.22}}>📄</div>
-        <div style={{fontSize:'12px',fontWeight:500,color:'var(--muted)',marginBottom:4}}>
+        <div style={{
+          width:32,height:2,background:'var(--lsg-red)',
+          margin:'0 auto 18px',
+        }}/>
+        <div style={{
+          fontSize:'13px',fontWeight:500,
+          color:'var(--lsg-text-primary)',marginBottom:4,
+        }}>
           Select a deal from the pipeline to preview a one-pager.
         </div>
-        <div style={{fontSize:'11px',color:'var(--dim)'}}>
+        <div style={{fontSize:'11px',color:'var(--lsg-text-tertiary)'}}>
           Add a deal in the PIPELINE tab to get started.
         </div>
       </div>
@@ -503,46 +551,61 @@ function OnePagerTab({ deals }) {
   };
   const ghostBtn = {
     padding:'6px 11px',fontSize:'11px',fontWeight:600,cursor:'pointer',
-    border:'1px solid var(--border2)',background:'var(--surface2)',color:'var(--muted)',
+    border:'1px solid var(--lsg-border-strong)',background:'var(--lsg-surface-alt)',
+    color:'var(--lsg-text-secondary)',
     borderRadius:'5px',fontFamily:'inherit',transition:'all .15s',
   };
   const primaryBtn = {
-    ...ghostBtn,background:'#111',color:'#fff',borderColor:'#111',
+    ...ghostBtn,
+    background:'var(--lsg-red)',color:'#fff',borderColor:'var(--lsg-red)',
   };
 
-  // Paper-style one-pager inner styles (adapted from lsg_one_pager_v4.html:
-  // keeps the example's institutional dark-header section strip, but scales
-  // typography up from 7.5–9px print sizes to screen-readable 9–11px)
+  // Paper-style one-pager inner styles — token-aligned (DESIGN_TOKENS.md).
+  // Structure is inspired by examples/lsg_one_pager_v4.html (dark section-header
+  // strip, three-box header row, dense KV grid), scaled up from 7.5–9px print
+  // sizes to screen-readable 9.5–11px. Palette stays in warm grayscale; red is
+  // reserved for the Print/Export CTA and the header rule.
   const paperStyle = {
-    background:'#ffffff',border:'1px solid #e5e3df',borderRadius:'4px',
-    boxShadow:'0 1px 2px rgba(0,0,0,.04)',overflow:'hidden',color:'#111',
+    background:'var(--lsg-surface)',
+    border:'1px solid var(--lsg-border-strong)',
+    borderRadius:'4px',
+    boxShadow:'0 1px 2px rgba(0,0,0,.04)',overflow:'hidden',
+    color:'var(--lsg-text-primary)',
   };
   const sectionHdr = {
     fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.09em',
-    background:'#111',color:'#fff',padding:'4px 8px',
+    background:'var(--lsg-text-primary)',color:'var(--lsg-surface)',
+    padding:'4px 8px',
   };
   const sectionBody = { padding:'6px 10px' };
   const kvRow = {
     display:'flex',justifyContent:'space-between',gap:6,padding:'2.5px 0',
-    fontSize:'10.5px',borderBottom:'1px solid #f4f3f1',lineHeight:1.4,
+    fontSize:'10.5px',borderBottom:'1px solid var(--lsg-border)',lineHeight:1.4,
   };
   const kvRowLast = { ...kvRow, borderBottom:'none' };
-  const kvK = { color:'#777',flexShrink:0 };
-  const kvV = { fontWeight:500,color:'#111',textAlign:'right',flex:1 };
+  const kvK = { color:'var(--lsg-text-tertiary)',flexShrink:0 };
+  const kvV = {
+    fontWeight:500,color:'var(--lsg-text-primary)',textAlign:'right',flex:1,
+  };
+  const kvVMono = {
+    ...kvV,
+    fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',
+  };
   const sectionWrap = {
-    border:'1px solid #e5e3df',borderRadius:'3px',overflow:'hidden',marginBottom:6,
+    border:'1px solid var(--lsg-border-strong)',borderRadius:'3px',
+    overflow:'hidden',marginBottom:6,
   };
 
   const em = '—';
   const V = (v) => (v == null || v === '') ? em : v;
 
-  // Render a compact key/value block
+  // KV row: `mono` flag uses Geist Mono + tabular-nums for numeric values.
   const KV = ({ rows }) => (
     <div>
       {rows.map((r, i) => (
         <div key={r.k} style={i === rows.length - 1 ? kvRowLast : kvRow}>
           <span style={kvK}>{r.k}</span>
-          <span style={kvV}>{V(r.v)}</span>
+          <span style={r.mono ? kvVMono : kvV}>{V(r.v)}</span>
         </div>
       ))}
     </div>
@@ -554,7 +617,7 @@ function OnePagerTab({ deals }) {
       <div style={sectionBody}>
         {children}
         {placeholder && (
-          <div style={{fontSize:'9px',color:'#b45309',fontStyle:'italic',marginTop:4,opacity:.8}}>
+          <div style={{fontSize:'9px',color:'var(--lsg-text-tertiary)',fontStyle:'italic',marginTop:4}}>
             Placeholder — data not yet modeled in this deal record.
           </div>
         )}
@@ -585,10 +648,13 @@ function OnePagerTab({ deals }) {
           display:'flex',alignItems:'center',gap:14,padding:'10px 14px',flexWrap:'wrap',
         }}>
           <div style={{display:'flex',alignItems:'baseline',gap:10,flex:'1 1 auto',minWidth:0}}>
-            <div style={{fontSize:'14px',fontWeight:700,color:'var(--text)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
+            <div style={{fontSize:'14px',fontWeight:700,color:'var(--lsg-text-primary)',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis'}}>
               {dealTitle}
             </div>
-            <div style={{fontSize:'10px',color:'var(--muted)',whiteSpace:'nowrap'}}>
+            <div style={{
+              fontSize:'10px',color:'var(--lsg-text-tertiary)',whiteSpace:'nowrap',
+              fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',
+            }}>
               Generated {generatedAt}
             </div>
           </div>
@@ -596,8 +662,10 @@ function OnePagerTab({ deals }) {
             value={selectedId}
             onChange={e => setSelectedId(e.target.value)}
             style={{
-              background:'var(--surface2)',border:'1px solid var(--border2)',borderRadius:'5px',
-              padding:'5px 8px',fontSize:'11px',color:'var(--text)',fontFamily:'inherit',
+              background:'var(--lsg-surface-alt)',
+              border:'1px solid var(--lsg-border-strong)',borderRadius:'5px',
+              padding:'5px 8px',fontSize:'11px',
+              color:'var(--lsg-text-primary)',fontFamily:'inherit',
               outline:'none',cursor:'pointer',minWidth:200,
             }}
           >
@@ -615,17 +683,23 @@ function OnePagerTab({ deals }) {
         </div>
       </div>
 
-      {/* ── Optional gap banner ─────────────────────────── */}
+      {/* ── Optional gap banner — warm warning tone, token-native ─── */}
       {unavailableCount > 0 && (
         <div style={{
-          background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'6px',
-          padding:'8px 14px',fontSize:'11px',color:'#92400e',
+          background:'var(--lsg-warning-subtle)',
+          border:'1px solid var(--lsg-border-strong)',
+          borderRadius:'6px',
+          padding:'8px 14px',fontSize:'11px',color:'var(--lsg-warning)',
           display:'flex',justifyContent:'space-between',alignItems:'center',gap:8,
+          flexWrap:'wrap',
         }}>
           <span>
-            <strong>{unavailableCount}</strong> fields not yet available — placeholders are shown where data is missing.
+            <strong style={{fontVariantNumeric:'tabular-nums'}}>{unavailableCount}</strong>
+            {' '}fields not yet available — placeholders are shown where data is missing.
           </span>
-          <span style={{fontSize:'10px',color:'#b45309',opacity:.8}}>Fill in from the Pipeline edit modal.</span>
+          <span style={{fontSize:'10px',color:'var(--lsg-text-tertiary)'}}>
+            Fill in from the Pipeline edit modal.
+          </span>
         </div>
       )}
 
@@ -633,35 +707,36 @@ function OnePagerTab({ deals }) {
       <div style={paperStyle}>
 
         {/* Title strip */}
-        <div style={{padding:'10px 14px 8px',borderBottom:'1px solid #e5e3df'}}>
+        <div style={{padding:'10px 14px 8px',borderBottom:'1px solid var(--lsg-border-strong)'}}>
           <div style={{display:'flex',alignItems:'baseline',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
             <div style={{minWidth:0,flex:'1 1 60%'}}>
-              <div style={{fontSize:'16px',fontWeight:700,letterSpacing:'.01em',color:'#111',lineHeight:1.2}}>
+              <div style={{fontSize:'17px',fontWeight:700,letterSpacing:'-.005em',color:'var(--lsg-text-primary)',lineHeight:1.2}}>
                 {dealTitle}
               </div>
               {deal.propertyAddress && (
-                <div style={{fontSize:'10.5px',color:'#555',marginTop:2}}>{deal.propertyAddress}</div>
+                <div style={{fontSize:'10.5px',color:'var(--lsg-text-secondary)',marginTop:2}}>
+                  {deal.propertyAddress}
+                </div>
               )}
             </div>
             <div style={{display:'flex',gap:6,alignItems:'center',flexWrap:'wrap'}}>
-              {deal.stage && (
-                <span style={{
-                  fontSize:'8.5px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.08em',
-                  background:'#111',color:'#fff',padding:'3px 7px',borderRadius:2,
-                }}>{deal.stage}</span>
-              )}
+              {deal.stage && <StageBadge stage={deal.stage} />}
               {deal.assetType && (
                 <span style={{
-                  fontSize:'8.5px',fontWeight:600,letterSpacing:'.03em',
-                  background:'#f0fdf4',border:'1px solid #bbf7d0',color:'#15803d',
-                  padding:'2px 7px',borderRadius:2,
+                  fontSize:'9px',fontWeight:600,letterSpacing:'.02em',
+                  background:'var(--lsg-surface-sunk)',
+                  border:'1px solid var(--lsg-border)',
+                  color:'var(--lsg-text-secondary)',
+                  padding:'2px 7px',borderRadius:3,
                 }}>{deal.assetType}</span>
               )}
               {deal.market && (
                 <span style={{
-                  fontSize:'8.5px',fontWeight:600,letterSpacing:'.03em',
-                  background:'#eff6ff',border:'1px solid #bfdbfe',color:'#1e40af',
-                  padding:'2px 7px',borderRadius:2,
+                  fontSize:'9px',fontWeight:600,letterSpacing:'.02em',
+                  background:'var(--lsg-surface-sunk)',
+                  border:'1px solid var(--lsg-border)',
+                  color:'var(--lsg-text-secondary)',
+                  padding:'2px 7px',borderRadius:3,
                 }}>{deal.market}</span>
               )}
             </div>
@@ -676,14 +751,14 @@ function OnePagerTab({ deals }) {
             <div style={sectionBody}>
               <KV rows={[
                 {k:'Type',     v: deal.assetType},
-                {k:'Size',     v: deal.sf},
-                {k:'Acreage',  v: deal.acreage},
-                {k:'Vintage',  v: deal.yearBuiltRenovated},
-                {k:'Parking',  v: deal.parkingCount},
+                {k:'Size',     v: deal.sf,                                         mono:true},
+                {k:'Acreage',  v: deal.acreage,                                    mono:true},
+                {k:'Vintage',  v: deal.yearBuiltRenovated,                         mono:true},
+                {k:'Parking',  v: deal.parkingCount,                               mono:true},
                 {k:'Leasing',  v: [
                   deal.occupancy,
                   formatWalt(deal.walt) ? formatWalt(deal.walt)+' WALT' : null,
-                ].filter(Boolean).join(' | ') || em},
+                ].filter(Boolean).join(' | ') || em,                               mono:true},
               ]}/>
             </div>
           </div>
@@ -696,19 +771,19 @@ function OnePagerTab({ deals }) {
                 {k:'Strategy',  v: null},
                 {k:'Seller',    v: null},
                 {k:'Sourcing',  v: deal.broker},
-                {k:'Bid Date',  v: deal.bidDate},
+                {k:'Bid Date',  v: deal.bidDate,                                   mono:true},
                 {k:'Source',    v: (deal.sourceFiles && deal.sourceFiles[0]) || null},
               ]}/>
             </div>
           </div>
-          {/* Scorecard (all placeholders) */}
+          {/* Scorecard (all placeholders — analyst-owned fields) */}
           <div style={sectionWrap}>
             <div style={sectionHdr}>Scorecard</div>
             <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:4,padding:'8px 8px 10px'}}>
               {['Overall','Market','Property','Location','Biz Plan'].map(lbl => (
                 <div key={lbl} style={{textAlign:'center'}}>
-                  <div style={{fontSize:'8px',textTransform:'uppercase',letterSpacing:'.07em',color:'#777',fontWeight:600,marginBottom:2}}>{lbl}</div>
-                  <div style={{fontSize:'15px',fontWeight:700,color:'#a8a5a1'}}>—</div>
+                  <div style={{fontSize:'8px',textTransform:'uppercase',letterSpacing:'.07em',color:'var(--lsg-text-tertiary)',fontWeight:600,marginBottom:2}}>{lbl}</div>
+                  <div style={{fontSize:'15px',fontWeight:700,color:'var(--lsg-text-disabled)',fontFamily:'var(--font-mono)'}}>—</div>
                 </div>
               ))}
             </div>
@@ -721,21 +796,21 @@ function OnePagerTab({ deals }) {
           <div>
             <Section title="Summary Metrics">
               <KV rows={[
-                {k:'Purchase Price', v: formatUSD(deal.askingPrice)},
-                {k:'Going-In Cap',   v: deal.capRate},
-                {k:'NOI',            v: deal.noi},
-                {k:'GLA (SF)',       v: deal.sf},
-                {k:'Occupancy',      v: deal.occupancy},
-                {k:'WALT',           v: formatWalt(deal.walt)},
+                {k:'Purchase Price', v: formatUSD(deal.askingPrice),        mono:true},
+                {k:'Going-In Cap',   v: deal.capRate,                       mono:true},
+                {k:'NOI',            v: deal.noi,                           mono:true},
+                {k:'GLA (SF)',       v: deal.sf,                            mono:true},
+                {k:'Occupancy',      v: deal.occupancy,                     mono:true},
+                {k:'WALT',           v: formatWalt(deal.walt),              mono:true},
               ]}/>
             </Section>
             <Section title="Market & Submarket">
               <KV rows={[
                 {k:'Market',           v: deal.market},
                 {k:'Submarket',        v: null},
-                {k:'Market Cap Range', v: null},
-                {k:'Rent Growth (3Y)', v: null},
-                {k:'Population (3-mi)',v: null},
+                {k:'Market Cap Range', v: null,                             mono:true},
+                {k:'Rent Growth (3Y)', v: null,                             mono:true},
+                {k:'Population (3-mi)',v: null,                             mono:true},
               ]}/>
             </Section>
           </div>
@@ -743,50 +818,57 @@ function OnePagerTab({ deals }) {
           <div>
             <Section title="Returns Summary">
               <KV rows={[
-                {k:'Levered IRR',    v: null},
-                {k:'MOIC',           v: null},
-                {k:'Cash-on-Cash',   v: null},
-                {k:'DSCR',           v: null},
-                {k:'Debt Yield',     v: null},
+                {k:'Levered IRR',    v: null,                               mono:true},
+                {k:'MOIC',           v: null,                               mono:true},
+                {k:'Cash-on-Cash',   v: null,                               mono:true},
+                {k:'DSCR',           v: null,                               mono:true},
+                {k:'Debt Yield',     v: null,                               mono:true},
               ]}/>
             </Section>
             <Section title="Capital Sources">
               <KV rows={[
-                {k:'Senior Debt',  v: null},
-                {k:'LTV',          v: null},
-                {k:'Rate',         v: null},
-                {k:'Term',         v: null},
-                {k:'Equity',       v: null},
+                {k:'Senior Debt',  v: null,                                 mono:true},
+                {k:'LTV',          v: null,                                 mono:true},
+                {k:'Rate',         v: null,                                 mono:true},
+                {k:'Term',         v: null,                                 mono:true},
+                {k:'Equity',       v: null,                                 mono:true},
               ]}/>
             </Section>
           </div>
           {/* Column 3 */}
           <div>
             <Section title="Sources & Uses">
-              <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'#777',marginBottom:2}}>Sources</div>
+              <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--lsg-text-tertiary)',marginBottom:2}}>Sources</div>
               <KV rows={[
-                {k:'Senior Debt',  v: null},
-                {k:'LP Equity',    v: null},
-                {k:'GP Equity',    v: null},
+                {k:'Senior Debt',  v: null,                                 mono:true},
+                {k:'LP Equity',    v: null,                                 mono:true},
+                {k:'GP Equity',    v: null,                                 mono:true},
               ]}/>
-              <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'#777',margin:'6px 0 2px'}}>Uses</div>
+              <div style={{fontSize:'9px',fontWeight:700,textTransform:'uppercase',letterSpacing:'.06em',color:'var(--lsg-text-tertiary)',margin:'6px 0 2px'}}>Uses</div>
               <KV rows={[
-                {k:'Purchase Price', v: formatUSD(deal.askingPrice)},
-                {k:'Closing Costs',  v: null},
-                {k:'Reserves',       v: null},
+                {k:'Purchase Price', v: formatUSD(deal.askingPrice),        mono:true},
+                {k:'Closing Costs',  v: null,                               mono:true},
+                {k:'Reserves',       v: null,                               mono:true},
               ]}/>
             </Section>
             <Section title="Key Anchors / Top Tenants">
               {anchors.length > 0 ? (
                 <div style={{display:'flex',flexDirection:'column',gap:2}}>
                   {anchors.map((a, i) => (
-                    <div key={i} style={{fontSize:'10.5px',color:'#111',padding:'1.5px 0',borderBottom: i===anchors.length-1 ? 'none' : '1px solid #f4f3f1'}}>
-                      {a}
-                    </div>
+                    <div
+                      key={i}
+                      style={{
+                        fontSize:'10.5px',color:'var(--lsg-text-primary)',
+                        padding:'2px 0',
+                        borderBottom: i===anchors.length-1 ? 'none' : '1px solid var(--lsg-border)',
+                      }}
+                    >{a}</div>
                   ))}
                 </div>
               ) : (
-                <div style={{fontSize:'10.5px',color:'#777',fontStyle:'italic'}}>No anchors recorded.</div>
+                <div style={{fontSize:'10.5px',color:'var(--lsg-text-tertiary)',fontStyle:'italic'}}>
+                  No anchors recorded.
+                </div>
               )}
             </Section>
           </div>
@@ -797,9 +879,10 @@ function OnePagerTab({ deals }) {
           <div style={{padding:'4px 10px 10px'}}>
             <div style={sectionWrap}>
               <div style={sectionHdr}>Notes / Overview</div>
-              <div style={{...sectionBody,fontSize:'10.5px',color:'#111',lineHeight:1.5,whiteSpace:'pre-wrap'}}>
-                {deal.notes}
-              </div>
+              <div style={{
+                ...sectionBody,fontSize:'10.5px',
+                color:'var(--lsg-text-primary)',lineHeight:1.5,whiteSpace:'pre-wrap',
+              }}>{deal.notes}</div>
             </div>
           </div>
         )}
@@ -807,11 +890,15 @@ function OnePagerTab({ deals }) {
         {/* Footer strap */}
         <div style={{
           display:'flex',justifyContent:'space-between',alignItems:'center',
-          padding:'6px 14px',borderTop:'1px solid #e5e3df',background:'#fafaf9',
-          fontSize:'9px',color:'#777',letterSpacing:'.04em',textTransform:'uppercase',
+          padding:'6px 14px',
+          borderTop:'1px solid var(--lsg-border-strong)',background:'var(--lsg-canvas)',
+          fontSize:'9px',color:'var(--lsg-text-tertiary)',
+          letterSpacing:'.04em',textTransform:'uppercase',
         }}>
           <span>Confidential &amp; Proprietary — LIGHTSTONE</span>
-          <span>{new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'})}</span>
+          <span style={{fontFamily:'var(--font-mono)',fontVariantNumeric:'tabular-nums',textTransform:'none',letterSpacing:0}}>
+            {new Date().toLocaleDateString('en-US',{month:'numeric',day:'numeric',year:'numeric'})}
+          </span>
         </div>
       </div>
     </div>
@@ -1038,12 +1125,54 @@ export default function App() {
       });
   }, []);
 
-  const stats = useMemo(() => ({
-    total: deals.length,
-    active: deals.filter(d=>d.stage!=='Dead').length,
-    bid: deals.filter(d=>d.stage==='Bid').length,
-    screening: deals.filter(d=>d.stage==='Screening').length,
-  }), [deals]);
+  // KPI strip data. Computed entirely from in-memory `deals` — no extra fetch.
+  // "Killed this month" uses updated_at as the closest available proxy for a
+  // kill timestamp (no dedicated `killed_at` column exists yet); pass_reason
+  // decomposition is deferred — see BACKLOG.md "Dead Deal Pass Reason Capture".
+  const kpiStats = useMemo(() => {
+    const now = new Date();
+    const curY = now.getFullYear();
+    const curM = now.getMonth();
+    const prev = new Date(curY, curM - 1, 1);
+    const prevY = prev.getFullYear();
+    const prevM = prev.getMonth();
+    const monthLabel = (y, m) => {
+      const d = new Date(y, m, 1);
+      return d.toLocaleDateString('en-US', { month:'short' }) + " '" + String(y).slice(2);
+    };
+    const ymPrefix = (y, m) => `${y}-${String(m + 1).padStart(2, '0')}`;
+    const curPrefix = ymPrefix(curY, curM);
+    const prevPrefix = ymPrefix(prevY, prevM);
+
+    const parseMoney = (v) => {
+      if (v == null || v === '') return null;
+      const n = parseFloat(String(v).replace(/[$,\s]/g, ''));
+      return Number.isFinite(n) ? n : null;
+    };
+
+    const active = deals.filter(d => d.stage !== 'Dead');
+    const activePriced = active.filter(d => parseMoney(d.askingPrice) != null).length;
+    const pipelineTotal = active.reduce((acc, d) => {
+      const n = parseMoney(d.askingPrice);
+      return n == null ? acc : acc + n;
+    }, 0);
+
+    const addedCur = deals.filter(d => (d.dateAdded || '').startsWith(curPrefix)).length;
+    const addedPrev = deals.filter(d => (d.dateAdded || '').startsWith(prevPrefix)).length;
+    const killedCur = deals.filter(
+      d => d.stage === 'Dead' && (d.updated_at || '').startsWith(curPrefix),
+    ).length;
+
+    return {
+      activeCount: active.length,
+      pipelineTotal,
+      activePriced,
+      addedCur, addedPrev,
+      killedCur,
+      curLabel: monthLabel(curY, curM),
+      prevLabel: monthLabel(prevY, prevM),
+    };
+  }, [deals]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -1347,12 +1476,51 @@ VITE_ANTHROPIC_API_KEY=sk-ant-...
 
         {activeTab === 'PIPELINE' && <>
 
-        {/* Stats */}
+        {/* KPI strip — Tier 2 §2.1 (DESIGN_TOKENS.md). Presentation-safe:
+            every tile is computed from current in-memory deal data. The Killed
+            tile's subline is a fallback — reason-decomposition requires a
+            `pass_reason` field, which is intentionally deferred (see
+            BACKLOG.md "Dead Deal Pass Reason Capture"). */}
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <StatCard label="Total Deals" value={stats.total}/>
-          <StatCard label="Active"       value={stats.active}/>
-          <StatCard label="At Bid"       value={stats.bid}/>
-          <StatCard label="Screening"    value={stats.screening}/>
+          <KpiTile
+            label="Active Deals"
+            value={kpiStats.activeCount}
+            subline="Across all stages except Dead"
+          />
+          <KpiTile
+            label={`Pipeline $`}
+            value={kpiStats.activeCount === 0 ? '—' : formatCompactUSD(kpiStats.pipelineTotal)}
+            subline={
+              kpiStats.activeCount === 0
+                ? 'No active deals on file'
+                : `${kpiStats.activePriced}/${kpiStats.activeCount} active deals priced`
+            }
+          />
+          <KpiTile
+            label={`Added · ${kpiStats.curLabel}`}
+            value={kpiStats.addedCur}
+            subline={
+              kpiStats.addedPrev === 0 && kpiStats.addedCur === 0
+                ? 'No adds this month'
+                : kpiStats.addedPrev === 0
+                ? `First tracked adds since ${kpiStats.prevLabel}`
+                : kpiStats.addedCur > kpiStats.addedPrev
+                ? `▲ ${kpiStats.addedCur - kpiStats.addedPrev} vs ${kpiStats.prevLabel}`
+                : kpiStats.addedCur < kpiStats.addedPrev
+                ? `▼ ${kpiStats.addedPrev - kpiStats.addedCur} vs ${kpiStats.prevLabel}`
+                : `On pace with ${kpiStats.prevLabel}`
+            }
+            subTone={
+              kpiStats.addedPrev > 0 && kpiStats.addedCur > kpiStats.addedPrev ? 'positive'
+              : kpiStats.addedPrev > 0 && kpiStats.addedCur < kpiStats.addedPrev ? 'negative'
+              : 'neutral'
+            }
+          />
+          <KpiTile
+            label={`Killed · ${kpiStats.curLabel}`}
+            value={kpiStats.killedCur}
+            subline="Reason capture planned post-v1"
+          />
         </div>
 
         {/* Table card */}

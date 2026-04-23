@@ -34,10 +34,11 @@ This project follows the operating discipline from the Hospitality Pricing Copil
 
 ## Current Status
 
-**Date:** 2026-04-17
+**Date:** 2026-04-23
 **Phase:** 3 — Preflight planning complete; awaiting implementation approval
 **Status:** Phase 1 complete ✓ | Phase 2 complete ✓ | Phase 3 preflight complete, not yet started
 **Side note:** 2026-04-17 Compare tab UI shell added for meeting demo only — does not promote the backlog comparison feature (see log entry).
+**Side note:** 2026-04-23 Pipeline KPI strip upgraded to Tier 2 §2.1 visual spec (presentation-safe slice); pass_reason capture formally deferred to BACKLOG.md (see log entry).
 
 **Completed as of this update:**
 - Phases 1 and 2 fully gated and complete
@@ -143,6 +144,66 @@ See BACKLOG.md for the full deferred list.
 ---
 
 ## Log
+
+### 2026-04-23 — ONE PAGER token refresh + Pipeline KPI strip upgrade + deferred pass_reason enhancement
+
+**What happened (three coordinated pieces in one session):**
+- **ONE PAGER token refresh (Tier 1.2 cleanup)** — the `OnePagerTab` component was originally built before the Tier 1 token port (2026-04-22). This pass token-aligned it: dropped the banned navy `#1e40af/#eff6ff` market chip, retired the decorative green `#15803d` asset-type chip, replaced every hardcoded `#111/#555/#777/#e5e3df/#f4f3f1/#fafaf9/#a8a5a1` with the corresponding `--lsg-*` token, moved the gap-banner to `--lsg-warning-subtle` / `--lsg-warning` / `--lsg-border-strong`, promoted the Print / Export PDF CTA to `--lsg-red` (the one deliberate red button on the page), reused `<StageBadge>` for the stage pill so it picks up the Tier 2 status-pill color map, and threaded a `mono: true` flag through the KV primitive so numeric values (Purchase Price / Going-In Cap / NOI / GLA / Occupancy / WALT / etc.) render in Geist Mono with `tabular-nums`.
+- **Pipeline KPI strip upgrade** — replaced the legacy `StatCard` (Total / Active / At Bid / Screening) with a four-tile KPI strip following Tier 2 §2.1 of `examples/DESIGN_TOKENS.md`. Advisor authorized this as a presentation-safe slice of Tier 2, not a Tier 2 kickoff.
+- **pass_reason governance decision** — recorded in `BACKLOG.md` that structured capture of why a deal was moved to Dead is strategically valuable and planned, but is NOT being implemented now because Phase 3 ingestion has not shipped and v1 is not yet complete.
+
+**ONE PAGER token refresh (code change):**
+- `src/App.jsx` — `OnePagerTab` body: paper styles (`paperStyle`, `sectionHdr`, `kvRow`, `sectionWrap`, `kvK`, `kvV`) swapped from raw hexes to `--lsg-*` tokens. Title-strip chips: `<StageBadge>` for stage; asset-type and market now render as warm surface-sunk pills with tertiary text (no navy, no decorative green). `KV` primitive extended with a `mono: true` row flag; applied to every numeric value row across Property / Transaction / Summary Metrics / Market & Submarket / Returns Summary / Capital Sources / Sources & Uses. Scorecard em-dashes use `--lsg-text-disabled` + Geist Mono. Gap banner moved to warm warning tokens. Footer date shifted to mono tabular-nums. Primary action button (Print / Export PDF) now uses `--lsg-red` (white text).
+- Keeps the existing data bindings, deal dropdown, and "no deals" empty state. Still front-end-only; no schema, no API, no real one-pager generation — the backlog item for real one-pager generation remains deferred.
+
+**Part A — KPI strip (code change):**
+- `src/App.jsx` — replaced `StatCard` with a new `KpiTile` component and a compact-USD formatter (`formatCompactUSD`): `$1.65b / $42.0m / $240k`. Added a `kpiStats` `useMemo` that computes each tile from in-memory deals only — no extra Supabase queries, no schema touches, no new API routes. The four tiles:
+  - **Active Deals** — count of `stage !== 'Dead'`. Subline: `"Across all stages except Dead"` (neutral). Real count; no delta claimed.
+  - **Pipeline $** — `Σ` parseable `askingPrice` across active deals, rendered compact. Subline: `"${activePriced}/${activeCount} active deals priced"` (neutral). Real sum. No delta.
+  - **Added · <Mon 'YY>** — count of `dateAdded` in current calendar month. Subline: real delta vs prior month (`▲ N vs Mar '26` in `--lsg-positive`, `▼ N vs Mar '26` in `--lsg-red-deep`, or `On pace with …` / `First tracked adds since …` / `No adds this month` as accurate fallbacks). Only the MoM comparison is real.
+  - **Killed · <Mon 'YY>** — count of `stage === 'Dead'` with `updated_at` starting with the current `YYYY-MM` prefix (best-effort proxy; no dedicated `killed_at` column). Subline: fixed fallback `"Reason capture planned post-v1"`. **Intentionally no decomposition** — the Tier 2 reference (`62% basis · 25% anchor · 13% mkt`) requires the `pass_reason` field, which has not been added.
+- Retired the old `stats` object and `StatCard` component — the new tiles fully replace them.
+- Visual: tiles use `--lsg-surface` / `--lsg-border` / `--lsg-text-primary` / `--lsg-text-tertiary` / `--lsg-red` bullet / `--lsg-positive` and `--lsg-red-deep` only for delta deltas. No navy, no decorative greens. Red footprint stays well under the 5% discipline rule.
+- Build passes clean (`vite build` — 410 kB JS / 12.3 kB CSS). HMR fired without errors across all edits.
+
+**Part B — pass_reason planning (docs only):**
+- `BACKLOG.md` — added "Dead Deal Pass Reason Capture" entry: purpose, rationale (sourcing intelligence, institutional memory, KPI decomposition feed), suggested structure (`pass_reason_primary` controlled category + optional `pass_reason_detail` free text), primary category list (Basis / pricing · Anchor / tenancy · Market · Lease rollover / WALT · Debt / financing · Returns · Sponsor / counterparty · Physical / capex · Competing priority / bandwidth · Other), future uses, and explicit post-M4 deferral note. Bumped "Last updated" to 2026-04-23.
+- This entry records the advisor decision to defer.
+
+**Why pass_reason is deferred right now:**
+- Project is still at Phase 3 preflight — ingestion implementation has not started; core workflow is not stable.
+- Adding `pass_reason_primary` / `pass_reason_detail` would require schema change (`db/schema.sql`), form field addition (edit modal + likely a stage-change modal on transition to Dead), mapper wiring (`src/lib/dealMapper.js`), and Supabase write paths — all of which are off-phase work in the middle of ingestion implementation.
+- The Killed-tile fallback subline is explicitly scoped so the KPI strip can ship presentation-safe without inventing data.
+
+**Future action (post-M4):**
+- Re-open this decision after Milestone M4 is achieved.
+- At that time, the advisor explicitly scopes (a) schema addition (primary column + optional detail column), (b) UI capture point (most likely a small modal triggered on stage change to Dead, primary category required, detail optional), and (c) reporting / KPI wiring that consumes it — including the Killed-tile decomposition subline per Tier 2 §2.1.
+- Only then does the item get promoted from `BACKLOG.md` to `TASKS.md` with explicit acceptance criteria, per the Promotion Criteria in `BACKLOG.md`.
+
+**Critical discipline — what was NOT touched:**
+- `TASKS.md` — intentionally unchanged. Nothing is being promoted yet.
+- `db/schema.sql` — no `pass_reason` column, no other schema changes.
+- `src/lib/dealMapper.js` — untouched. `pass_reason` is NOT in `fromDbRow` / `toDbRow`.
+- Pipeline edit modal, form fields, Supabase writes — untouched. No `pass_reason` capture point in code.
+- `api/ingest-om.js`, `api/blob-upload.js`, `vercel.json` — untouched. Phase 3 ingestion is still gated on its existing blockers (Vercel Pro, `BLOB_READ_WRITE_TOKEN`, implementation-plan approval).
+- Locked Decisions — all 8 still in force. Milestones, phase definitions, Do Not Overbuild list — unchanged.
+- Tier 2 §2.1 is NOT fully opened by this pass. Remaining Tier 2 patterns (section-header signature, row treatment, status pill color map, priority badges) are still scoped as post-Phase-3 work. This was a single-pattern carve-out, not a tier promotion.
+
+**Acceptance check:**
+- Pipeline page renders the 4-tile KPI strip. Active Deals / Pipeline $ / Added · <cur month> / Killed · <cur month> all populate from current deal data.
+- Killed tile shows a neutral fallback subline, not a fabricated decomposition.
+- No backend, schema, or form changes shipped.
+- `BACKLOG.md` contains a clear, deferred pass_reason entry. `TASKS.md` unchanged.
+
+**Files changed this session:**
+- `src/App.jsx` — KPI strip (replaced `StatCard` with `KpiTile`, added `formatCompactUSD`, rebuilt the 4-card render block and `stats` → `kpiStats` `useMemo`).
+- `BACKLOG.md` — added "Dead Deal Pass Reason Capture" item; bumped "Last updated" to 2026-04-23.
+- `PROJECT_OPERATING_LOG.md` — this entry; Current Status date bumped to 2026-04-23 with a side note.
+
+**Next action:**
+- Return focus to the main roadmap — Phase 3 ingestion implementation. The three Phase 3 blockers (Vercel Pro confirmation, `BLOB_READ_WRITE_TOKEN`, user approval of the implementation plan) still gate start. No further analytics / KPI / reason-capture work until M4.
+
+---
 
 ### 2026-04-22 — Tier 1 aesthetic port: LSG design tokens, Geist fonts, wordmark, accent consistency
 

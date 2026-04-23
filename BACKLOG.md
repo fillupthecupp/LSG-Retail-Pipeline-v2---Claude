@@ -1,7 +1,7 @@
 # Backlog — Retail Deal Pipeline & Screener
 **Deferred features. None of these are in scope for merged v1.**
 **Promote an item to TASKS.md only after M4 (v1 complete) and with explicit advisor scoping.**
-**Last updated:** 2026-04-22
+**Last updated:** 2026-04-23
 
 ---
 
@@ -90,6 +90,45 @@ Current UI is desktop-first. A responsive redesign for phone/tablet would requir
 - Email or Slack alert as bid date approaches
 - Broker follow-up reminders
 - Stage change notifications
+
+---
+
+## Dead Deal Pass Reason Capture
+
+Capture structured reasons when a deal moves to the Dead stage, so "why we passed" becomes queryable institutional memory instead of living only in free-text notes or analyst recall.
+
+**Purpose:**
+- Explicit reason-capture on stage transition to Dead (Screening/Underwriting/Bid/Active → Dead)
+- Structured enough to aggregate (KPI decomposition, source analysis) without losing the nuance of free-text detail
+
+**Rationale:**
+- Improves sourcing intelligence — broker-by-broker and market-by-market kill-reason patterns become visible
+- Improves institutional memory — future analysts can see why prior deals in the same submarket/anchor/sponsor were killed, without re-reading every note
+- Enables future Killed-deal KPI decomposition — the "Killed · <month>" tile's subline can show the reason mix (e.g. `62% basis · 25% anchor · 13% market`) per the Tier 2 KPI strip spec in `examples/DESIGN_TOKENS.md` §2.1. Today that tile carries a fallback subline because the underlying field does not exist.
+- Feeds the screener / hurdle-rate backlog: knowing historical kill thresholds sharpens the future hurdle calibration
+
+**Suggested future structure:**
+- `pass_reason_primary` — controlled category (one of the list below)
+- `pass_reason_detail` — optional free text (1–2 sentences; analyst's own words)
+
+**Suggested primary categories (controlled list):**
+- Basis / pricing
+- Anchor / tenancy
+- Market
+- Lease rollover / WALT
+- Debt / financing
+- Returns
+- Sponsor / counterparty
+- Physical / capex
+- Competing priority / bandwidth
+- Other
+
+**Future uses:**
+- Killed-deal KPI decomposition on the Pipeline page (Tier 2 KPI strip)
+- Source analysis — aggregate kill reasons by broker, market, asset type
+- Pipeline learning / feedback loop — surface patterns like "last three Dead deals in Atlanta industrial were all basis-driven" to shape future screening criteria
+
+**Dependency:** Defer implementation until after M4 / merged v1 complete. Scope only after the core workflow is stable. When promoted, explicitly scope (a) the schema addition, (b) the UI capture point — most likely a small reason-capture modal triggered on stage change to Dead, with primary category required and detail optional — and (c) the reporting / KPI wiring that consumes it. Follow the Promotion Criteria below.
 
 ---
 
